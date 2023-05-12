@@ -19,12 +19,11 @@ docdir = "/usr/share/doc/awx"
 
 
 def use_scm_version():
-    return False if version_file() else True
+    return not version_file()
 
 
 def get_version_from_file():
-    vf = version_file()
-    if vf:
+    if vf := version_file():
         with open(vf, 'r') as file:
             return file.read().strip()
 
@@ -38,30 +37,26 @@ def version_file():
 
 
 def setup_requires():
-    if version_file():
-        return []
-    else:
-        return ['setuptools_scm']
+    return [] if version_file() else ['setuptools_scm']
 
 
 extra_setup_args = {}
 if not version_file():
-    extra_setup_args.update(dict(use_scm_version=use_scm_version(), setup_requires=setup_requires()))
+    extra_setup_args |= dict(
+        use_scm_version=use_scm_version(), setup_requires=setup_requires()
+    )
 
 if os.path.exists("/etc/debian_version"):
     sysinit = "/etc/init.d"
-    webconfig = "/etc/nginx"
-    siteconfig = "/etc/nginx/sites-enabled"
-    # sosreport-3.1 (and newer) look in '/usr/share/sosreport/sos/plugins'
-    # sosreport-3.0 looks in '/usr/lib/python2.7/dist-packages/sos/plugins'
-    # debian/<package>.links will create symlinks to support both versions
-    sosconfig = "/usr/share/sosreport/sos/plugins"
 else:
     sysinit = "/etc/rc.d/init.d"
-    webconfig = "/etc/nginx"
-    siteconfig = "/etc/nginx/sites-enabled"
-    # The .spec will create symlinks to support multiple versions of sosreport
-    sosconfig = "/usr/share/sosreport/sos/plugins"
+
+# sosreport-3.1 (and newer) look in '/usr/share/sosreport/sos/plugins'
+# sosreport-3.0 looks in '/usr/lib/python2.7/dist-packages/sos/plugins'
+# debian/<package>.links will create symlinks to support both versions
+sosconfig = "/usr/share/sosreport/sos/plugins"
+siteconfig = "/etc/nginx/sites-enabled"
+webconfig = "/etc/nginx"
 
 #####################################################################
 # Helper Functions
@@ -120,7 +115,8 @@ setup(
     author='Ansible, Inc.',
     author_email='info@ansible.com',
     description='awx: API, UI and Task Engine for Ansible',
-    long_description='AWX provides a web-based user interface, REST API and ' 'task engine built on top of Ansible',
+    long_description='AWX provides a web-based user interface, REST API and '
+    'task engine built on top of Ansible',
     license='Apache License 2.0',
     keywords='ansible',
     url='http://github.com/ansible/awx',
@@ -133,7 +129,8 @@ setup(
         'Framework :: Django',
         'Intended Audience :: Developers',
         'Intended Audience :: Information Technology',
-        'Intended Audience :: System Administrators' 'License :: Apache License 2.0',
+        'Intended Audience :: System Administrators'
+        'License :: Apache License 2.0',
         'Natural Language :: English',
         'Operating System :: OS Independent',
         'Operating System :: POSIX',
@@ -158,29 +155,37 @@ setup(
     },
     data_files=proc_data_files(
         [
-            ("%s" % homedir, ["awx/static/favicon.ico"]),
-            ("%s" % siteconfig, ["config/awx-nginx.conf"]),
-            #        ("%s" % webconfig,      ["config/uwsgi_params"]),
-            ("%s" % sharedir, ["tools/scripts/request_tower_configuration.sh", "tools/scripts/request_tower_configuration.ps1"]),
+            (f"{homedir}", ["awx/static/favicon.ico"]),
+            (f"{siteconfig}", ["config/awx-nginx.conf"]),
             (
-                "%s" % docdir,
+                f"{sharedir}",
+                [
+                    "tools/scripts/request_tower_configuration.sh",
+                    "tools/scripts/request_tower_configuration.ps1",
+                ],
+            ),
+            (
+                f"{docdir}",
                 [
                     "docs/licenses/*",
                 ],
             ),
             (
-                "%s" % bindir,
+                f"{bindir}",
                 [
                     "tools/scripts/automation-controller-service",
                     "tools/scripts/failure-event-handler",
                     "tools/scripts/awx-python",
                 ],
             ),
-            ("%s" % sosconfig, ["tools/sosreport/controller.py"]),
+            (f"{sosconfig}", ["tools/sosreport/controller.py"]),
         ]
     ),
     options={
-        'aliases': {'dev_build': 'clean --all egg_info sdist', 'release_build': 'clean --all egg_info -b "" sdist'},
+        'aliases': {
+            'dev_build': 'clean --all egg_info sdist',
+            'release_build': 'clean --all egg_info -b "" sdist',
+        },
         'build_scripts': {
             'executable': '/usr/bin/awx-python',
         },

@@ -39,7 +39,7 @@ def safe_name(s):
 # Second granularity; Per-minute
 class FixedSlidingWindow:
     def __init__(self, start_time=None):
-        self.buckets = dict()
+        self.buckets = {}
         self.start_time = start_time or now_seconds()
 
     def cleanup(self, now_bucket=None):
@@ -70,7 +70,7 @@ class BroadcastWebsocketStatsManager:
         self._local_hostname = local_hostname
 
         self._event_loop = event_loop
-        self._stats = dict()
+        self._stats = {}
         self._redis_key = BROADCAST_WEBSOCKET_REDIS_KEY_NAME
 
     def new_remote_host_stats(self, remote_hostname):
@@ -165,5 +165,4 @@ class BroadcastWebsocketStats:
     def serialize(self):
         self.render()
 
-        registry_data = generate_latest(self._registry).decode('UTF-8')
-        return registry_data
+        return generate_latest(self._registry).decode('UTF-8')

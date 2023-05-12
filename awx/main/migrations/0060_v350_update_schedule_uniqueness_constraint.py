@@ -5,6 +5,8 @@ from __future__ import unicode_literals
 from django.db import migrations, models
 
 
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -18,7 +20,6 @@ class Migration(migrations.Migration):
             field=models.CharField(max_length=512),
         ),
         migrations.AlterUniqueTogether(
-            name='schedule',
-            unique_together=set([('unified_job_template', 'name')]),
+            name='schedule', unique_together={('unified_job_template', 'name')}
         ),
     ]

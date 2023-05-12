@@ -57,10 +57,12 @@ class ModelAccessPermission(permissions.BasePermission):
             parent_obj = view.get_parent_object()
             if not check_user_access(request.user, view.parent_model, 'read', parent_obj):
                 return False
-            if hasattr(view, 'parent_key'):
-                if not check_user_access(request.user, view.model, 'add', {view.parent_key: parent_obj}):
-                    return False
-            return True
+            return bool(
+                not hasattr(view, 'parent_key')
+                or check_user_access(
+                    request.user, view.model, 'add', {view.parent_key: parent_obj}
+                )
+            )
         elif hasattr(view, 'obj_permission_type'):
             # Generic object-centric view permission check without object not needed
             if not obj:
@@ -114,12 +116,13 @@ class ModelAccessPermission(permissions.BasePermission):
 
         # Check permissions for the given view and object, based on the request
         # method used.
-        check_method = getattr(self, 'check_%s_permissions' % request.method.lower(), None)
-        result = check_method and check_method(request, view, obj)
-        if not result:
+        check_method = getattr(
+            self, f'check_{request.method.lower()}_permissions', None
+        )
+        if result := check_method and check_method(request, view, obj):
+            return result
+        else:
             raise PermissionDenied()
-
-        return result
 
     def has_permission(self, request, view, obj=None):
         logger.debug('has_permission(user=%s method=%s data=%r, %s, %r)', request.user, request.method, request.data, view.__class__.__name__, obj)
@@ -191,7 +194,7 @@ class TaskPermission(ModelAccessPermission):
         # view, also that the job or inventory being accessed matches the auth
         # token.
         if view.model == Inventory and request.method.lower() in ('head', 'get'):
-            return bool(not obj or obj.pk == unified_job.inventory_id)
+            return not obj or obj.pk == unified_job.inventory_id
         else:
             return False
 

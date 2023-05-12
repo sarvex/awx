@@ -38,15 +38,14 @@ class Command(BaseCommand):
         n_deleted_items = 0
         pks_to_delete = set()
         for asobj in ActivityStream.objects.iterator():
-            asobj_disp = '"%s" id: %s' % (str(asobj), asobj.id)
+            asobj_disp = f'"{str(asobj)}" id: {asobj.id}'
             if asobj.timestamp >= self.cutoff:
                 if self.dry_run:
-                    self.logger.info("would skip %s" % asobj_disp)
+                    self.logger.info(f"would skip {asobj_disp}")
+            elif self.dry_run:
+                self.logger.info(f"would delete {asobj_disp}")
             else:
-                if self.dry_run:
-                    self.logger.info("would delete %s" % asobj_disp)
-                else:
-                    pks_to_delete.add(asobj.pk)
+                pks_to_delete.add(asobj.pk)
             # Cleanup objects in batches instead of deleting each one individually.
             if len(pks_to_delete) >= 500:
                 ActivityStream.objects.filter(pk__in=pks_to_delete).delete()
@@ -55,7 +54,7 @@ class Command(BaseCommand):
         if len(pks_to_delete):
             ActivityStream.objects.filter(pk__in=pks_to_delete).delete()
             n_deleted_items += len(pks_to_delete)
-        self.logger.info("Removed {} items".format(n_deleted_items))
+        self.logger.info(f"Removed {n_deleted_items} items")
 
     def handle(self, *args, **options):
         self.verbosity = int(options.get('verbosity', 1))

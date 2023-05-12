@@ -24,7 +24,11 @@ def create_through_relations(apps, schema_editor):
         Target = apps.get_model('main', cls)
         for x in Target.objects.iterator():
             for i, instance_group in enumerate(x.instance_groups.all()):
-                Membership(instancegroup=instance_group, position=i, **{'%s' % cls.lower(): x}).save()
+                Membership(
+                    instancegroup=instance_group,
+                    position=i,
+                    **{f'{cls.lower()}': x},
+                ).save()
 
 
 class Migration(migrations.Migration):

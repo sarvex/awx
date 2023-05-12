@@ -30,10 +30,7 @@ DEPRECATED_CRED_KIND = {
 
 
 def _generate_deprecated_cred_types():
-    ret = {}
-    for deprecated_kind in DEPRECATED_CRED_KIND:
-        ret[deprecated_kind] = None
-    return ret
+    return {deprecated_kind: None for deprecated_kind in DEPRECATED_CRED_KIND}
 
 
 def _populate_deprecated_cred_types(cred, kind):

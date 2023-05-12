@@ -176,7 +176,12 @@ class InventoryLabelList(DeleteLastUnattachLabelMixin, SubListCreateAttachDetach
                 del request.data['organization']
         if Label.objects.filter(inventory_labels=self.kwargs['pk']).count() > 100:
             return Response(
-                dict(msg=_('Maximum number of labels for {} reached.'.format(self.parent_model._meta.verbose_name_raw))), status=status.HTTP_400_BAD_REQUEST
+                dict(
+                    msg=_(
+                        f'Maximum number of labels for {self.parent_model._meta.verbose_name_raw} reached.'
+                    )
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
             )
         return super(InventoryLabelList, self).post(request, *args, **kwargs)
 

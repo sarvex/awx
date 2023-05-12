@@ -11,7 +11,7 @@ from oauth2_provider.models import RefreshToken
 def revoke_tokens(token_list):
     for token in token_list:
         token.revoke()
-        print('revoked {} {}'.format(token.__class__.__name__, token.token))
+        print(f'revoked {token.__class__.__name__} {token.token}')
 
 
 class Command(BaseCommand):

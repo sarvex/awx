@@ -31,9 +31,7 @@ class AutoSchema(DRFAuthSchema):
         except Exception:
             serializer = None
             warnings.warn(
-                '{}.get_serializer() raised an exception during '
-                'schema generation. Serializer fields will not be '
-                'generated for {} {}.'.format(self.view.__class__.__name__, method, path)
+                f'{self.view.__class__.__name__}.get_serializer() raised an exception during schema generation. Serializer fields will not be generated for {method} {path}.'
             )
 
         link.__dict__['deprecated'] = getattr(self.view, 'deprecated', False)
@@ -46,13 +44,12 @@ class AutoSchema(DRFAuthSchema):
         elif hasattr(self.view, 'model'):
             link.__dict__['topic'] = str(self.view.model._meta.verbose_name_plural).title()
         else:
-            warnings.warn('Could not determine a Swagger tag for path {}'.format(path))
+            warnings.warn(f'Could not determine a Swagger tag for path {path}')
         return link
 
     def get_description(self, path, method):
         setattr(self.view.request, 'swagger_method', method)
-        description = super(AutoSchema, self).get_description(path, method)
-        return description
+        return super(AutoSchema, self).get_description(path, method)
 
 
 class SwaggerSchemaView(APIView):
@@ -76,18 +73,18 @@ class SwaggerSchemaView(APIView):
         for path, node in document.items():
             if isinstance(node, Object):
                 for action in node.values():
-                    topic = getattr(action, 'topic', None)
-                    if topic:
+                    if topic := getattr(action, 'topic', None):
                         schema._data.setdefault(topic, Object())
                         schema._data[topic]._data[path] = node
 
                     if isinstance(action, Object):
-                        for link in action.links.values():
-                            if link.deprecated:
-                                _deprecated.append(link.url)
+                        _deprecated.extend(
+                            link.url
+                            for link in action.links.values()
+                            if link.deprecated
+                        )
             elif isinstance(node, Link):
-                topic = getattr(node, 'topic', None)
-                if topic:
+                if topic := getattr(node, 'topic', None):
                     schema._data.setdefault(topic, Object())
                     schema._data[topic]._data[path] = node
 

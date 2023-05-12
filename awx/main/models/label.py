@@ -46,4 +46,4 @@ class Label(CommonModelNameNotUnique):
         c1 = UnifiedJob.objects.filter(labels__in=[self.id]).count()
         c2 = UnifiedJobTemplate.objects.filter(labels__in=[self.id]).count()
         c3 = Inventory.objects.filter(labels__in=[self.id]).count()
-        return (c1 + c2 + c3 - 1) == 0
+        return c1 + c2 + c3 == 1

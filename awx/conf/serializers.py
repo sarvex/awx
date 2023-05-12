@@ -84,6 +84,11 @@ class SettingSingletonSerializer(serializers.Serializer):
             # Make LICENSE read-only here; LICENSE is only updated via /api/v2/config/
             if key == 'LICENSE':
                 extra_kwargs['read_only'] = True
-            field = settings_registry.get_setting_field(key, mixin_class=SettingFieldMixin, for_user=bool(category_slug == 'user'), **extra_kwargs)
+            field = settings_registry.get_setting_field(
+                key,
+                mixin_class=SettingFieldMixin,
+                for_user=category_slug == 'user',
+                **extra_kwargs
+            )
             fields[key] = field
         return fields

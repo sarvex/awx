@@ -168,9 +168,10 @@ def approle_auth(**kwargs):
     url = urljoin(kwargs['url'], 'v1')
     cacert = kwargs.get('cacert', None)
 
-    request_kwargs = {'timeout': 30}
-    # AppRole Login
-    request_kwargs['json'] = {'role_id': role_id, 'secret_id': secret_id}
+    request_kwargs = {
+        'timeout': 30,
+        'json': {'role_id': role_id, 'secret_id': secret_id},
+    }
     sess = requests.Session()
     # Namespace support
     if kwargs.get('namespace'):
@@ -180,8 +181,7 @@ def approle_auth(**kwargs):
         request_kwargs['verify'] = cert
         resp = sess.post(request_url, **request_kwargs)
     resp.raise_for_status()
-    token = resp.json()['auth']['client_token']
-    return token
+    return resp.json()['auth']['client_token']
 
 
 def kv_backend(**kwargs):
@@ -199,7 +199,7 @@ def kv_backend(**kwargs):
     }
 
     sess = requests.Session()
-    sess.headers['Authorization'] = 'Bearer {}'.format(token)
+    sess.headers['Authorization'] = f'Bearer {token}'
     # Compatibility header for older installs of Hashicorp Vault
     sess.headers['X-Vault-Token'] = token
     if kwargs.get('namespace'):
@@ -218,11 +218,10 @@ def kv_backend(**kwargs):
                 mount_point, path = secret_path, []
             # https://www.vaultproject.io/api/secret/kv/kv-v2.html#read-secret-version
             path_segments = [mount_point, 'data'] + path
+    elif secret_backend:
+        path_segments = [secret_backend, secret_path]
     else:
-        if secret_backend:
-            path_segments = [secret_backend, secret_path]
-        else:
-            path_segments = [secret_path]
+        path_segments = [secret_path]
 
     request_url = urljoin(url, '/'.join(['v1'] + path_segments)).rstrip('/')
     with CertFiles(cacert) as cert:
@@ -238,7 +237,7 @@ def kv_backend(**kwargs):
         try:
             return json['data'][secret_key]
         except KeyError:
-            raise RuntimeError('{} is not present at {}'.format(secret_key, secret_path))
+            raise RuntimeError(f'{secret_key} is not present at {secret_path}')
     return json['data']
 
 
@@ -252,14 +251,14 @@ def ssh_backend(**kwargs):
     request_kwargs = {
         'timeout': 30,
         'allow_redirects': False,
+        'json': {'public_key': kwargs['public_key']},
     }
 
-    request_kwargs['json'] = {'public_key': kwargs['public_key']}
     if kwargs.get('valid_principals'):
         request_kwargs['json']['valid_principals'] = kwargs['valid_principals']
 
     sess = requests.Session()
-    sess.headers['Authorization'] = 'Bearer {}'.format(token)
+    sess.headers['Authorization'] = f'Bearer {token}'
     if kwargs.get('namespace'):
         sess.headers['X-Vault-Namespace'] = kwargs['namespace']
     # Compatability header for older installs of Hashicorp Vault

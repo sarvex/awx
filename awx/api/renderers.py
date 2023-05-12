@@ -129,10 +129,11 @@ class PrometheusJSONRenderer(renderers.JSONRenderer):
         parsed_metrics = text_string_to_metric_families(data)
         data = {}
         for family in parsed_metrics:
-            data[family.name] = {}
-            data[family.name]['help_text'] = family.documentation
-            data[family.name]['type'] = family.type
-            data[family.name]['samples'] = []
+            data[family.name] = {
+                'help_text': family.documentation,
+                'type': family.type,
+                'samples': [],
+            }
             for sample in family.samples:
                 sample_dict = {"labels": sample[1], "value": sample[2]}
                 if family.type == 'histogram':

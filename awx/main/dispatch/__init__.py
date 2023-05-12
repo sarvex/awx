@@ -20,11 +20,11 @@ class PubSub(object):
 
     def listen(self, channel):
         with self.conn.cursor() as cur:
-            cur.execute('LISTEN "%s";' % channel)
+            cur.execute(f'LISTEN "{channel}";')
 
     def unlisten(self, channel):
         with self.conn.cursor() as cur:
-            cur.execute('UNLISTEN "%s";' % channel)
+            cur.execute(f'UNLISTEN "{channel}";')
 
     def notify(self, channel, payload):
         with self.conn.cursor() as cur:
@@ -50,6 +50,5 @@ def pg_bus_conn():
     conn = psycopg2.connect(dbname=conf['NAME'], host=conf['HOST'], user=conf['USER'], password=conf['PASSWORD'], port=conf['PORT'], **conf.get("OPTIONS", {}))
     # Django connection.cursor().connection doesn't have autocommit=True on
     conn.set_session(autocommit=True)
-    pubsub = PubSub(conn)
-    yield pubsub
+    yield PubSub(conn)
     conn.close()

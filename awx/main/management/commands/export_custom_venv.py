@@ -24,8 +24,7 @@ class Command(BaseCommand):
             path = options.get('path')
             all_venvs = get_custom_venv_choices()
             if path[0] in all_venvs:
-                pip_data = get_custom_venv_pip_freeze(options.get('path')[0])
-                if pip_data:
+                if pip_data := get_custom_venv_pip_freeze(options.get('path')[0]):
                     if not options.get('q'):
                         msg = [
                             '# Virtual environment contents:',

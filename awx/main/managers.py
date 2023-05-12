@@ -64,21 +64,26 @@ class HostManager(models.Manager):
             )
         )
 
-        if hasattr(self, 'instance') and hasattr(self.instance, 'host_filter') and hasattr(self.instance, 'kind'):
-            if self.instance.kind == 'smart' and self.instance.host_filter is not None:
-                q = SmartFilter.query_from_string(self.instance.host_filter)
-                if self.instance.organization_id:
-                    q = q.filter(inventory__organization=self.instance.organization_id)
-                # If we are using host_filters, disable the core_filters, this allows
-                # us to access all of the available Host entries, not just the ones associated
-                # with a specific FK/relation.
-                #
-                # If we don't disable this, a filter of {'inventory': self.instance} gets automatically
-                # injected by the related object mapper.
-                self.core_filters = {}
+        if (
+            hasattr(self, 'instance')
+            and hasattr(self.instance, 'host_filter')
+            and hasattr(self.instance, 'kind')
+            and self.instance.kind == 'smart'
+            and self.instance.host_filter is not None
+        ):
+            q = SmartFilter.query_from_string(self.instance.host_filter)
+            if self.instance.organization_id:
+                q = q.filter(inventory__organization=self.instance.organization_id)
+            # If we are using host_filters, disable the core_filters, this allows
+            # us to access all of the available Host entries, not just the ones associated
+            # with a specific FK/relation.
+            #
+            # If we don't disable this, a filter of {'inventory': self.instance} gets automatically
+            # injected by the related object mapper.
+            self.core_filters = {}
 
-                qs = qs & q
-                return qs.order_by('name', 'pk').distinct('name')
+            qs = qs & q
+            return qs.order_by('name', 'pk').distinct('name')
         return qs
 
 
@@ -117,7 +122,7 @@ class InstanceManager(models.Manager):
         if not hostname:
             hostname = settings.CLUSTER_HOST_ID
 
-        with advisory_lock('instance_registration_%s' % hostname):
+        with advisory_lock(f'instance_registration_{hostname}'):
             if settings.AWX_AUTO_DEPROVISION_INSTANCES:
                 # detect any instances with the same IP address.
                 # if one exists, set it to None
@@ -151,40 +156,36 @@ class InstanceManager(models.Manager):
                 if instance.node_type != node_type:
                     instance.node_type = node_type
                     update_fields.append('node_type')
-                if update_fields:
-                    instance.save(update_fields=update_fields)
-                    return (True, instance)
-                else:
+                if not update_fields:
                     return (False, instance)
 
+                instance.save(update_fields=update_fields)
+                return (True, instance)
             # Create new instance, and fill in default values
             create_defaults = dict(capacity=0)
             if defaults is not None:
-                create_defaults.update(defaults)
-            uuid_option = {}
-            if uuid is not None:
-                uuid_option = dict(uuid=uuid)
+                create_defaults |= defaults
+            uuid_option = dict(uuid=uuid) if uuid is not None else {}
             if node_type == 'execution' and 'version' not in create_defaults:
                 create_defaults['version'] = RECEPTOR_PENDING
             instance = self.create(hostname=hostname, ip_address=ip_address, node_type=node_type, **create_defaults, **uuid_option)
         return (True, instance)
 
     def get_or_register(self):
-        if settings.AWX_AUTO_DEPROVISION_INSTANCES:
-            from awx.main.management.commands.register_queue import RegisterQueue
-
-            pod_ip = os.environ.get('MY_POD_IP')
-            if settings.IS_K8S:
-                registered = self.register(ip_address=pod_ip, node_type='control', uuid=settings.SYSTEM_UUID)
-            else:
-                registered = self.register(ip_address=pod_ip, uuid=settings.SYSTEM_UUID)
-            RegisterQueue(settings.DEFAULT_CONTROL_PLANE_QUEUE_NAME, 100, 0, [], is_container_group=False).register()
-            RegisterQueue(
-                settings.DEFAULT_EXECUTION_QUEUE_NAME, 100, 0, [], is_container_group=True, pod_spec_override=settings.DEFAULT_EXECUTION_QUEUE_POD_SPEC_OVERRIDE
-            ).register()
-            return registered
-        else:
+        if not settings.AWX_AUTO_DEPROVISION_INSTANCES:
             return (False, self.me())
+        from awx.main.management.commands.register_queue import RegisterQueue
+
+        pod_ip = os.environ.get('MY_POD_IP')
+        if settings.IS_K8S:
+            registered = self.register(ip_address=pod_ip, node_type='control', uuid=settings.SYSTEM_UUID)
+        else:
+            registered = self.register(ip_address=pod_ip, uuid=settings.SYSTEM_UUID)
+        RegisterQueue(settings.DEFAULT_CONTROL_PLANE_QUEUE_NAME, 100, 0, [], is_container_group=False).register()
+        RegisterQueue(
+            settings.DEFAULT_EXECUTION_QUEUE_NAME, 100, 0, [], is_container_group=True, pod_spec_override=settings.DEFAULT_EXECUTION_QUEUE_POD_SPEC_OVERRIDE
+        ).register()
+        return registered
 
 
 class InstanceGroupManager(models.Manager):
@@ -203,7 +204,11 @@ class InstanceGroupManager(models.Manager):
         ig_instance_mapping = {}
         # Create dictionaries that represent basic m2m memberships
         for group in qs:
-            ig_instance_mapping[group.name] = set(instance.hostname for instance in group.instances.all() if instance.capacity != 0)
+            ig_instance_mapping[group.name] = {
+                instance.hostname
+                for instance in group.instances.all()
+                if instance.capacity != 0
+            }
             for inst in group.instances.all():
                 if inst.capacity == 0:
                     continue
@@ -269,7 +274,9 @@ class InstanceGroupManager(models.Manager):
                 for group_name in control_groups:
                     if group_name not in graph:
                         self.zero_out_group(graph, group_name, breakdown)
-                    graph[group_name][f'consumed_control_capacity'] += settings.AWX_CONTROL_NODE_TASK_IMPACT
+                    graph[group_name][
+                        'consumed_control_capacity'
+                    ] += settings.AWX_CONTROL_NODE_TASK_IMPACT
                     if breakdown:
                         graph[group_name]['committed_capacity'] += settings.AWX_CONTROL_NODE_TASK_IMPACT
             elif t.status == 'running':
@@ -277,10 +284,7 @@ class InstanceGroupManager(models.Manager):
                 if t.execution_node not in instance_ig_mapping:
                     if not t.is_container_group_task:
                         logger.warning('Detected %s running inside lost instance, ' 'may still be waiting for reaper.', t.log_format)
-                    if t.instance_group:
-                        impacted_groups = [t.instance_group.name]
-                    else:
-                        impacted_groups = []
+                    impacted_groups = [t.instance_group.name] if t.instance_group else []
                 else:
                     impacted_groups = instance_ig_mapping[t.execution_node]
 
@@ -295,7 +299,9 @@ class InstanceGroupManager(models.Manager):
                 for group_name in control_groups:
                     if group_name not in graph:
                         self.zero_out_group(graph, group_name, breakdown)
-                    graph[group_name][f'consumed_control_capacity'] += settings.AWX_CONTROL_NODE_TASK_IMPACT
+                    graph[group_name][
+                        'consumed_control_capacity'
+                    ] += settings.AWX_CONTROL_NODE_TASK_IMPACT
                     if breakdown:
                         graph[group_name]['running_capacity'] += settings.AWX_CONTROL_NODE_TASK_IMPACT
             else:

@@ -33,4 +33,4 @@ class Command(BaseCommand):
                     os.chmod(script_path, stat.S_IRWXU)
                     tar.add(script_path, arcname=script_filename)
 
-        print('Dump of old custom inventory scripts at {}'.format(tar_filename))
+        print(f'Dump of old custom inventory scripts at {tar_filename}')

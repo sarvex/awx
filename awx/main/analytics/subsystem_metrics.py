@@ -40,10 +40,7 @@ class BaseM:
 
 class FloatM(BaseM):
     def decode_value(self, value):
-        if value is not None:
-            return float(value)
-        else:
-            return 0.0
+        return float(value) if value is not None else 0.0
 
     def store_value(self, conn):
         conn.hincrbyfloat(root_key, self.field, self.current_value)
@@ -52,10 +49,7 @@ class FloatM(BaseM):
 
 class IntM(BaseM):
     def decode_value(self, value):
-        if value is not None:
-            return int(value)
-        else:
-            return 0
+        return int(value) if value is not None else 0
 
     def store_value(self, conn):
         conn.hincrby(root_key, self.field, self.current_value)
@@ -64,10 +58,7 @@ class IntM(BaseM):
 
 class SetIntM(BaseM):
     def decode_value(self, value):
-        if value is not None:
-            return int(value)
-        else:
-            return 0
+        return int(value) if value is not None else 0
 
     def store_value(self, conn):
         # do not set value if it has not changed since last time this was called
@@ -78,10 +69,7 @@ class SetIntM(BaseM):
 
 class SetFloatM(SetIntM):
     def decode_value(self, value):
-        if value is not None:
-            return float(value)
-        else:
-            return 0
+        return float(value) if value is not None else 0
 
 
 class HistogramM(BaseM):
@@ -89,9 +77,9 @@ class HistogramM(BaseM):
         self.buckets = buckets
         self.buckets_to_keys = {}
         for b in buckets:
-            self.buckets_to_keys[b] = IntM(field + '_' + str(b), '')
-        self.inf = IntM(field + '_inf', '')
-        self.sum = IntM(field + '_sum', '')
+            self.buckets_to_keys[b] = IntM(f'{field}_{str(b)}', '')
+        self.inf = IntM(f'{field}_inf', '')
+        self.sum = IntM(f'{field}_sum', '')
         super(HistogramM, self).__init__(field, help_text)
 
     def clear_value(self, conn):
@@ -128,7 +116,7 @@ class HistogramM(BaseM):
         output_text = f"# HELP {self.field} {self.help_text}\n# TYPE {self.field} histogram\n"
         for instance in instance_data:
             for i, b in enumerate(self.buckets):
-                output_text += f'{self.field}_bucket{{le="{b}",node="{instance}"}} {sum(instance_data[instance][self.field]["counts"][0:i+1])}\n'
+                output_text += f'{self.field}_bucket{{le="{b}",node="{instance}"}} {sum(instance_data[instance][self.field]["counts"][:i + 1])}\n'
             output_text += f'{self.field}_bucket{{le="+Inf",node="{instance}"}} {instance_data[instance][self.field]["inf"]}\n'
             output_text += f'{self.field}_count{{node="{instance}"}} {instance_data[instance][self.field]["inf"]}\n'
             output_text += f'{self.field}_sum{{node="{instance}"}} {instance_data[instance][self.field]["sum"]}\n'
@@ -180,7 +168,7 @@ class Metrics:
         for m in self.METRICS.values():
             m.clear_value(self.conn)
         self.metrics_have_changed = True
-        self.conn.delete(root_key + "_lock")
+        self.conn.delete(f"{root_key}_lock")
 
     def inc(self, field, value):
         if value != 0:
@@ -206,26 +194,19 @@ class Metrics:
         return json.dumps(data)
 
     def load_local_metrics(self):
-        # generate python dictionary of key values from metrics stored in redis
-        data = {}
-        for field in self.METRICS:
-            data[field] = self.METRICS[field].decode(self.conn)
-        return data
+        return {field: self.METRICS[field].decode(self.conn) for field in self.METRICS}
 
     def store_metrics(self, data_json):
         # called when receiving metrics from other instances
         data = json.loads(data_json)
         if self.instance_name != data['instance']:
             logger.debug(f"{self.instance_name} received subsystem metrics from {data['instance']}")
-        self.conn.set(root_key + "_instance_" + data['instance'], data['metrics'])
+        self.conn.set(f"{root_key}_instance_" + data['instance'], data['metrics'])
 
     def should_pipe_execute(self):
         if self.metrics_have_changed is False:
             return False
-        if time.time() - self.last_pipe_execute > self.pipe_execute_interval:
-            return True
-        else:
-            return False
+        return time.time() - self.last_pipe_execute > self.pipe_execute_interval
 
     def pipe_execute(self):
         if self.metrics_have_changed is True:
@@ -247,7 +228,7 @@ class Metrics:
     def send_metrics(self):
         # more than one thread could be calling this at the same time, so should
         # get acquire redis lock before sending metrics
-        lock = self.conn.lock(root_key + '_lock', thread_local=False)
+        lock = self.conn.lock(f'{root_key}_lock', thread_local=False)
         if not lock.acquire(blocking=False):
             return
         try:
@@ -274,16 +255,18 @@ class Metrics:
         instances_filter = request.query_params.getlist("node")
         # get a sorted list of instance names
         instance_names = [self.instance_name]
-        for m in self.conn.scan_iter(root_key + '_instance_*'):
-            instance_names.append(m.decode('UTF-8').split('_instance_')[1])
+        instance_names.extend(
+            m.decode('UTF-8').split('_instance_')[1]
+            for m in self.conn.scan_iter(f'{root_key}_instance_*')
+        )
         instance_names.sort()
         # load data, including data from the this local instance
         instance_data = {}
         for instance in instance_names:
             if len(instances_filter) == 0 or instance in instances_filter:
-                instance_data_from_redis = self.conn.get(root_key + '_instance_' + instance)
-                # data from other instances may not be available. That is OK.
-                if instance_data_from_redis:
+                if instance_data_from_redis := self.conn.get(
+                    f'{root_key}_instance_{instance}'
+                ):
                     instance_data[instance] = json.loads(instance_data_from_redis.decode('UTF-8'))
         return instance_data
 

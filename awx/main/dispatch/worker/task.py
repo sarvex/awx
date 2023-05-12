@@ -34,14 +34,12 @@ class TaskWorker(BaseWorker):
         awx.main.tasks.jobs.RunProjectUpdate
         """
         if not task.startswith('awx.'):
-            raise ValueError('{} is not a valid awx task'.format(task))
+            raise ValueError(f'{task} is not a valid awx task')
         module, target = task.rsplit('.', 1)
         module = importlib.import_module(module)
-        _call = None
-        if hasattr(module, target):
-            _call = getattr(module, target, None)
+        _call = getattr(module, target, None) if hasattr(module, target) else None
         if not (hasattr(_call, 'apply_async') and hasattr(_call, 'delay')):
-            raise ValueError('{} is not decorated with @task()'.format(task))
+            raise ValueError(f'{task} is not decorated with @task()')
 
         return _call
 
@@ -61,7 +59,7 @@ class TaskWorker(BaseWorker):
             # return its `run()` method
             _call = _call().run
         # don't print kwargs, they often contain launch-time secrets
-        logger.debug('task {} starting {}(*{})'.format(uuid, task, args))
+        logger.debug(f'task {uuid} starting {task}(*{args})')
         return _call(*args, **kwargs)
 
     def perform_work(self, body):
@@ -94,12 +92,12 @@ class TaskWorker(BaseWorker):
             try:
                 if getattr(exc, 'is_awx_task_error', False):
                     # Error caused by user / tracked in job output
-                    logger.warning("{}".format(exc))
+                    logger.warning(f"{exc}")
                 else:
                     task = body['task']
                     args = body.get('args', [])
                     kwargs = body.get('kwargs', {})
-                    logger.exception('Worker failed to run task {}(*{}, **{}'.format(task, args, kwargs))
+                    logger.exception(f'Worker failed to run task {task}(*{args}, **{kwargs}')
             except Exception:
                 # It's fairly critical that this code _not_ raise exceptions on logging
                 # If you configure external logging in a way that _it_ fails, there's

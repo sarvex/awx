@@ -83,8 +83,7 @@ class OAuth2ProviderField(fields.DictField):
 
     def to_internal_value(self, data):
         data = super(OAuth2ProviderField, self).to_internal_value(data)
-        invalid_flags = set(data.keys()) - self.valid_key_names
-        if invalid_flags:
+        if invalid_flags := set(data.keys()) - self.valid_key_names:
             self.fail('invalid_key_names', invalid_key_names=', '.join(list(invalid_flags)))
         return data
 

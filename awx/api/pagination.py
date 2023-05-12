@@ -81,7 +81,7 @@ class LimitPagination(pagination.BasePagination):
         self.limit = self.get_limit(request)
         self.request = request
 
-        return list(queryset[0 : self.limit])
+        return list(queryset[:self.limit])
 
     def get_paginated_response(self, data):
         return Response(OrderedDict([('results', data)]))

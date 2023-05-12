@@ -42,7 +42,7 @@ def create_system_job_templates(apps, schema_editor):
     if created:
         sched = Schedule(
             name='Cleanup Job Schedule',
-            rrule='DTSTART:%s RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=SU' % now_str,
+            rrule=f'DTSTART:{now_str} RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=SU',
             description='Automatically Generated Schedule',
             enabled=True,
             extra_data={'days': '120'},
@@ -69,7 +69,7 @@ def create_system_job_templates(apps, schema_editor):
     if created:
         sched = Schedule(
             name='Cleanup Activity Schedule',
-            rrule='DTSTART:%s RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=TU' % now_str,
+            rrule=f'DTSTART:{now_str} RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=TU',
             description='Automatically Generated Schedule',
             enabled=True,
             extra_data={'days': '355'},
@@ -92,7 +92,7 @@ def create_system_job_templates(apps, schema_editor):
     if created:
         sched = Schedule(
             name='Cleanup Fact Schedule',
-            rrule='DTSTART:%s RRULE:FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=1' % now_str,
+            rrule=f'DTSTART:{now_str} RRULE:FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=1',
             description='Automatically Generated Schedule',
             enabled=True,
             extra_data={'older_than': '120d', 'granularity': '1w'},

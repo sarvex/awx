@@ -12,7 +12,7 @@ def remove_scan_type_nodes(apps, schema_editor):
         for node in cls.objects.iterator():
             prompts = node.char_prompts
             if prompts.get('job_type', None) == 'scan':
-                log_text = '{} set job_type to scan, which was deprecated in 3.2, removing.'.format(cls)
+                log_text = f'{cls} set job_type to scan, which was deprecated in 3.2, removing.'
                 if cls == WorkflowJobNode:
                     logger.info(log_text)
                 else:

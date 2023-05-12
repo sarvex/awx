@@ -89,13 +89,10 @@ class ActivityStream(models.Model):
     def __str__(self):
         operation = self.operation if 'operation' in self.__dict__ else '_delayed_'
         if 'timestamp' in self.__dict__:
-            if self.timestamp:
-                timestamp = self.timestamp.isoformat()
-            else:
-                timestamp = self.timestamp
+            timestamp = self.timestamp.isoformat() if self.timestamp else self.timestamp
         else:
             timestamp = '_delayed_'
-        return u'%s-%s-pk=%s' % (operation, timestamp, self.pk)
+        return f'{operation}-{timestamp}-pk={self.pk}'
 
     def get_absolute_url(self, request=None):
         return reverse('api:activity_stream_detail', kwargs={'pk': self.pk}, request=request)

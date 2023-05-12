@@ -25,9 +25,9 @@ class Command(BaseCommand):
             return
         (changed, instance) = Instance.objects.register(hostname=hostname, node_type=node_type, uuid=uuid)
         if changed:
-            print("Successfully registered instance {}".format(hostname))
+            print(f"Successfully registered instance {hostname}")
         else:
-            print("Instance already registered {}".format(instance.hostname))
+            print(f"Instance already registered {instance.hostname}")
         self.changed = changed
 
     @transaction.atomic

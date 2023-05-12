@@ -21,7 +21,7 @@ def chart_color_lookup(color_str):
 
 
 def clear_screen():
-    print(chr(27) + "[2J")
+    print(f"{chr(27)}[2J")
 
 
 class JobStatus:
@@ -59,10 +59,7 @@ class JobStatusController:
 
     def generate_status(self):
         line = ""
-        lines = []
-        for p in self.plots:
-            lines.append(f'{p.color_code}{p.status} {p.y[-1]}{self.RESET}')
-
+        lines = [f'{p.color_code}{p.status} {p.y[-1]}{self.RESET}' for p in self.plots]
         line += ", ".join(lines) + '\n'
 
         width = 5

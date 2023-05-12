@@ -52,13 +52,9 @@ class RecordedQueryLog(object):
             # build a printable Python stack
             bt = ' '.join(traceback.format_stack())
 
-            # and re-run the same query w/ EXPLAIN
-            explain = ''
             cursor = self.db.cursor()
-            cursor.execute('EXPLAIN VERBOSE {}'.format(sql))
-            for line in cursor.fetchall():
-                explain += line[0] + '\n'
-
+            cursor.execute(f'EXPLAIN VERBOSE {sql}')
+            explain = ''.join(line[0] + '\n' for line in cursor.fetchall())
             # write a row of data into a per-PID sqlite database
             if not os.path.isdir(self.dest):
                 os.makedirs(self.dest)
@@ -69,7 +65,7 @@ class RecordedQueryLog(object):
                     break
             else:
                 progname = os.path.basename(sys.argv[0])
-            filepath = os.path.join(self.dest, '{}.sqlite'.format(progname))
+            filepath = os.path.join(self.dest, f'{progname}.sqlite')
             version = pkg_resources.get_distribution('awx').version
             log = sqlite3.connect(filepath, timeout=3)
             log.execute(

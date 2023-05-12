@@ -67,17 +67,15 @@ def aim_backend(**kwargs):
     app_id = kwargs['app_id']
     object_query = kwargs['object_query']
     object_query_format = kwargs['object_query_format']
-    reason = kwargs.get('reason', None)
-
     query_params = {
         'AppId': app_id,
         'Query': object_query,
         'QueryFormat': object_query_format,
     }
-    if reason:
+    if reason := kwargs.get('reason', None):
         query_params['reason'] = reason
 
-    request_qs = '?' + urlencode(query_params, quote_via=quote)
+    request_qs = f'?{urlencode(query_params, quote_via=quote)}'
     request_url = urljoin(url, '/'.join(['AIMWebService', 'api', 'Accounts']))
 
     with CertFiles(client_cert, client_key) as cert:

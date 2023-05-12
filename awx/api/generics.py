@@ -93,19 +93,27 @@ class LoggedLoginView(auth_views.LoginView):
         ret = super(LoggedLoginView, self).post(request, *args, **kwargs)
         current_user = getattr(request, 'user', None)
         if request.user.is_authenticated:
-            logger.info(smart_text(u"User {} logged in from {}".format(self.request.user.username, request.META.get('REMOTE_ADDR', None))))
+            logger.info(
+                smart_text(
+                    f"User {self.request.user.username} logged in from {request.META.get('REMOTE_ADDR', None)}"
+                )
+            )
             ret.set_cookie('userLoggedIn', 'true')
             current_user = UserSerializer(self.request.user)
             current_user = smart_text(JSONRenderer().render(current_user.data))
-            current_user = urllib.parse.quote('%s' % current_user, '')
+            current_user = urllib.parse.quote(f'{current_user}', '')
             ret.set_cookie('current_user', current_user, secure=settings.SESSION_COOKIE_SECURE or None)
 
-            return ret
         else:
             if 'username' in self.request.POST:
-                logger.warn(smart_text(u"Login failed for user {} from {}".format(self.request.POST.get('username'), request.META.get('REMOTE_ADDR', None))))
+                logger.warn(
+                    smart_text(
+                        f"Login failed for user {self.request.POST.get('username')} from {request.META.get('REMOTE_ADDR', None)}"
+                    )
+                )
             ret.status_code = 401
-            return ret
+
+        return ret
 
 
 class LoggedLogoutView(auth_views.LogoutView):
@@ -115,7 +123,7 @@ class LoggedLogoutView(auth_views.LogoutView):
         current_user = getattr(request, 'user', None)
         ret.set_cookie('userLoggedIn', 'false')
         if (not current_user or not getattr(current_user, 'pk', True)) and current_user != original_user:
-            logger.info("User {} logged out.".format(original_user.username))
+            logger.info(f"User {original_user.username} logged out.")
         return ret
 
 
@@ -126,17 +134,16 @@ def get_view_description(view, html=False):
     """
     desc = views.get_view_description(view, html=html)
     if html:
-        desc = '<div class="description">%s</div>' % desc
+        desc = f'<div class="description">{desc}</div>'
     return mark_safe(desc)
 
 
 def get_default_schema():
-    if settings.SETTINGS_MODULE == 'awx.settings.development':
-        from awx.api.swagger import AutoSchema
-
-        return AutoSchema()
-    else:
+    if settings.SETTINGS_MODULE != 'awx.settings.development':
         return views.APIView.schema
+    from awx.api.swagger import AutoSchema
+
+    return AutoSchema()
 
 
 class APIView(views.APIView):
@@ -227,7 +234,9 @@ class APIView(views.APIView):
                 status_msg = getattr(settings, 'API_400_ERROR_LOG_FORMAT').format(**msg_data)
             except Exception as e:
                 if getattr(settings, 'API_400_ERROR_LOG_FORMAT', None):
-                    logger.error("Unable to format API_400_ERROR_LOG_FORMAT setting, defaulting log message: {}".format(e))
+                    logger.error(
+                        f"Unable to format API_400_ERROR_LOG_FORMAT setting, defaulting log message: {e}"
+                    )
                 status_msg = settings_registry.get_setting_field('API_400_ERROR_LOG_FORMAT').get_default().format(**msg_data)
 
             if hasattr(self, '__init_request_error__'):
@@ -302,7 +311,7 @@ class APIView(views.APIView):
         template_list = []
         for klass in inspect.getmro(type(self)):
             template_basename = camelcase_to_underscore(klass.__name__)
-            template_list.append('api/%s.md' % template_basename)
+            template_list.append(f'api/{template_basename}.md')
         context = self.get_description_context()
 
         description = render_to_string(template_list, context)
@@ -312,10 +321,7 @@ class APIView(views.APIView):
         return description
 
     def update_raw_data(self, data):
-        # Remove the parent key if the view is a sublist, since it will be set
-        # automatically.
-        parent_key = getattr(self, 'parent_key', None)
-        if parent_key:
+        if parent_key := getattr(self, 'parent_key', None):
             data.pop(parent_key, None)
 
         # Use request data as-is when original request is an update and the
@@ -339,9 +345,12 @@ class APIView(views.APIView):
         return super(APIView, self).dispatch(request, *args, **kwargs)
 
     def check_permissions(self, request):
-        if request.method not in ('GET', 'OPTIONS', 'HEAD'):
-            if 'write' not in getattr(request.user, 'oauth_scopes', ['write']):
-                raise PermissionDenied()
+        if request.method not in (
+            'GET',
+            'OPTIONS',
+            'HEAD',
+        ) and 'write' not in getattr(request.user, 'oauth_scopes', ['write']):
+            raise PermissionDenied()
         return super(APIView, self).check_permissions(request)
 
 
@@ -499,7 +508,7 @@ class ParentMixin(object):
     def check_parent_access(self, parent=None):
         parent = parent or self.get_parent_object()
         parent_access = getattr(self, 'parent_access', 'read')
-        if parent_access in ('read', 'delete'):
+        if parent_access in {'read', 'delete'}:
             args = (self.parent_model, parent_access, parent)
         else:
             args = (self.parent_model, parent_access, parent, None)
@@ -609,9 +618,7 @@ class SubListCreateAPIView(SubListAPIView, ListCreateAPIView):
             data = QueryDict('')
             data.update(request.data)
 
-        # add the parent key to the post data using the pk from the URL
-        parent_key = getattr(self, 'parent_key', None)
-        if parent_key:
+        if parent_key := getattr(self, 'parent_key', None):
             data[parent_key] = self.kwargs['pk']
 
         # attempt to deserialize the object
@@ -693,13 +700,12 @@ class SubListCreateAttachDetachAPIView(SubListCreateAPIView):
         if sub not in relationship.all():
             relationship.add(sub)
 
-        if created:
-            headers = {}
-            if location:
-                headers['Location'] = location
-            return Response(data, status=status.HTTP_201_CREATED, headers=headers)
-        else:
+        if not created:
             return Response(status=status.HTTP_204_NO_CONTENT)
+        headers = {}
+        if location:
+            headers['Location'] = location
+        return Response(data, status=status.HTTP_201_CREATED, headers=headers)
 
     def unattach_validate(self, request):
         sub_id = request.data.get('id', None)
@@ -730,9 +736,7 @@ class SubListCreateAttachDetachAPIView(SubListCreateAPIView):
 
     def unattach(self, request, *args, **kwargs):
         (sub_id, res) = self.unattach_validate(request)
-        if res:
-            return res
-        return self.unattach_by_id(request, sub_id)
+        return res if res else self.unattach_by_id(request, sub_id)
 
     def post(self, request, *args, **kwargs):
         if not isinstance(request.data, dict):
@@ -751,10 +755,17 @@ class SubListAttachDetachAPIView(SubListCreateAttachDetachAPIView):
     metadata_class = SublistAttachDetatchMetadata
 
     def post(self, request, *args, **kwargs):
-        sub_id = request.data.get('id', None)
-        if not sub_id:
-            return Response(dict(msg=_("{} 'id' field is missing.".format(self.model._meta.verbose_name.title()))), status=status.HTTP_400_BAD_REQUEST)
-        return super(SubListAttachDetachAPIView, self).post(request, *args, **kwargs)
+        if sub_id := request.data.get('id', None):
+            return super(SubListAttachDetachAPIView, self).post(request, *args, **kwargs)
+        else:
+            return Response(
+                dict(
+                    msg=_(
+                        f"{self.model._meta.verbose_name.title()} 'id' field is missing."
+                    )
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     def update_raw_data(self, data):
         request_method = getattr(self, '_raw_data_request_method', None)
@@ -918,7 +929,7 @@ class CopyAPIView(GenericAPIView):
             elif field.many_to_one and field_val == old_parent:
                 create_kwargs[field.name] = new_parent
             elif field.name == 'name' and not old_parent:
-                create_kwargs[field.name] = copy_name or field_val + ' copy'
+                create_kwargs[field.name] = copy_name or f'{field_val} copy'
             elif field.name in fields_to_preserve:
                 create_kwargs[field.name] = CopyAPIView._decrypt_model_field_if_needed(obj, field.name, field_val)
 
@@ -931,7 +942,7 @@ class CopyAPIView(GenericAPIView):
             create_kwargs['unified_job_template'] = new_approval_template
 
         new_obj = model.objects.create(**create_kwargs)
-        logger.debug('Deep copy: Created new object {}({})'.format(new_obj, model))
+        logger.debug(f'Deep copy: Created new object {new_obj}({model})')
         # Need to save separatedly because Djang-crum get_current_user would
         # not work properly in non-request-response-cycle context.
         new_obj.created_by = creater
@@ -939,20 +950,22 @@ class CopyAPIView(GenericAPIView):
         from awx.main.signals import disable_activity_stream
 
         with disable_activity_stream():
-            for m2m in m2m_to_preserve:
-                for related_obj in m2m_to_preserve[m2m].all():
+            for m2m, value in m2m_to_preserve.items():
+                for related_obj in value.all():
                     getattr(new_obj, m2m).add(related_obj)
         if not old_parent:
             sub_objects = []
-            for o2m in o2m_to_preserve:
-                for sub_obj in o2m_to_preserve[o2m].all():
+            for value_ in o2m_to_preserve.values():
+                for sub_obj in value_.all():
                     sub_model = type(sub_obj)
                     sub_objects.append((sub_model.__module__, sub_model.__name__, sub_obj.pk))
             return new_obj, sub_objects
         ret = {obj: new_obj}
-        for o2m in o2m_to_preserve:
-            for sub_obj in o2m_to_preserve[o2m].all():
-                ret.update(CopyAPIView.copy_model_obj(obj, new_obj, type(sub_obj), sub_obj, creater))
+        for value__ in o2m_to_preserve.values():
+            for sub_obj in value__.all():
+                ret |= CopyAPIView.copy_model_obj(
+                    obj, new_obj, type(sub_obj), sub_obj, creater
+                )
         return ret
 
     def get(self, request, *args, **kwargs):
@@ -971,9 +984,10 @@ class CopyAPIView(GenericAPIView):
     def post(self, request, *args, **kwargs):
         obj = self.get_object()
         create_kwargs = self._build_create_dict(obj)
-        create_kwargs_check = {}
-        for key in create_kwargs:
-            create_kwargs_check[key] = getattr(create_kwargs[key], 'pk', None) or create_kwargs[key]
+        create_kwargs_check = {
+            key: getattr(create_kwargs[key], 'pk', None) or create_kwargs[key]
+            for key in create_kwargs
+        }
         if not request.user.can_access(self.model, 'add', create_kwargs_check):
             raise PermissionDenied()
         if not request.user.can_access(self.model, 'copy_related', obj):
@@ -990,7 +1004,7 @@ class CopyAPIView(GenericAPIView):
             # store the copied object dict into cache, because it's
             # often too large for postgres' notification bus
             # (which has a default maximum message size of 8k)
-            key = 'deep-copy-{}'.format(str(uuid.uuid4()))
+            key = f'deep-copy-{str(uuid.uuid4())}'
             cache.set(key, sub_objs, timeout=3600)
             permission_check_func = None
             if hasattr(type(self), 'deep_copy_permission_check_func'):
@@ -1018,5 +1032,4 @@ class BaseUsersList(SubListCreateAttachDetachAPIView):
                 ret.data['is_system_auditor'] = request.data['is_system_auditor']
         except AttributeError as exc:
             print(exc)
-            pass
         return ret

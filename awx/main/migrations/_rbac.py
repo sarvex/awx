@@ -59,7 +59,9 @@ def delete_all_custom_script_roles(apps, schema_editor):
         role.delete()
         role_ct += 1
     if role_ct:
-        logger.debug('Deleted {} roles corresponding to custom inventory sources.'.format(role_ct))
+        logger.debug(
+            f'Deleted {role_ct} roles corresponding to custom inventory sources.'
+        )
 
 
 UNIFIED_ORG_LOOKUPS = {
@@ -134,13 +136,17 @@ def _migrate_unified_organization(apps, unified_cls_name, backward=False):
     for cls in UnifiedClass.__subclasses__():
         cls_name = cls._meta.model_name
         if backward and UNIFIED_ORG_LOOKUPS.get(cls_name, 'not-found') is not None:
-            logger.debug('Not reverse migrating {}, existing data should remain valid'.format(cls_name))
+            logger.debug(
+                f'Not reverse migrating {cls_name}, existing data should remain valid'
+            )
             continue
-        logger.debug('{}Migrating {} to new organization field'.format('Reverse ' if backward else '', cls_name))
+        logger.debug(
+            f"{'Reverse ' if backward else ''}Migrating {cls_name} to new organization field"
+        )
 
         sub_qs = implicit_org_subquery(UnifiedClass, cls, backward=backward)
         if sub_qs is None:
-            logger.debug('Class {} has no organization migration'.format(cls_name))
+            logger.debug(f'Class {cls_name} has no organization migration')
             continue
 
         this_ct = ContentType.objects.get_for_model(cls)
@@ -149,7 +155,7 @@ def _migrate_unified_organization(apps, unified_cls_name, backward=False):
         else:
             r = UnifiedClass.objects.order_by().filter(polymorphic_ctype=this_ct).update(tmp_organization=sub_qs)
         if r:
-            logger.info('Organization migration on {} affected {} rows.'.format(cls_name, r))
+            logger.info(f'Organization migration on {cls_name} affected {r} rows.')
     logger.info('Unified organization migration completed in {:.4f} seconds'.format(time() - start))
 
 
@@ -190,12 +196,12 @@ def _restore_inventory_admins(apps, schema_editor, backward=False):
             ),
             ('execute_role', ('execute_role',)),
         ):
-            role_id = getattr(jt, '{}_id'.format(jt_role))
+            role_id = getattr(jt, f'{jt_role}_id')
 
             user_qs = User.objects
             if not backward:
                 # In this specific case, the name for the org role and JT roles were the same
-                org_role_ids = [getattr(org, '{}_id'.format(role_name)) for role_name in org_roles]
+                org_role_ids = [getattr(org, f'{role_name}_id') for role_name in org_roles]
                 user_qs = user_qs.filter(roles__in=org_role_ids)
                 # bizarre migration behavior - ancestors / descendents of
                 # migration version of Role model is reversed, using current model briefly
@@ -215,7 +221,7 @@ def _restore_inventory_admins(apps, schema_editor, backward=False):
 
             role = getattr(jt, jt_role)
             logger.debug(
-                '{} {} on jt {} for users {} via inventory.organization {}'.format('Removing' if backward else 'Setting', jt_role, jt.pk, user_ids, org.pk)
+                f"{'Removing' if backward else 'Setting'} {jt_role} on jt {jt.pk} for users {user_ids} via inventory.organization {org.pk}"
             )
             if not backward:
                 # in reverse, explit role becomes redundant
@@ -301,18 +307,20 @@ def rebuild_role_parentage(apps, schema_editor, models=None):
         removals.update(parents_removed)
         if parents_added:
             model_ct += 1
-            logger.debug('Added to parents of roles {} of {}'.format(parents_added, content_object))
+            logger.debug(f'Added to parents of roles {parents_added} of {content_object}')
         if parents_removed:
             model_ct += 1
-            logger.debug('Removed from parents of roles {} of {}'.format(parents_removed, content_object))
+            logger.debug(
+                f'Removed from parents of roles {parents_removed} of {content_object}'
+            )
         else:
             noop_ct += 1
 
-    logger.debug('No changes to role parents for {} resources'.format(noop_ct))
-    logger.debug('Added parents to {} roles'.format(len(additions)))
-    logger.debug('Removed parents from {} roles'.format(len(removals)))
+    logger.debug(f'No changes to role parents for {noop_ct} resources')
+    logger.debug(f'Added parents to {len(additions)} roles')
+    logger.debug(f'Removed parents from {len(removals)} roles')
     if model_ct:
-        logger.info('Updated implicit parents of {} resources'.format(model_ct))
+        logger.info(f'Updated implicit parents of {model_ct} resources')
 
     logger.info('Rebuild parentage completed in %f seconds' % (time() - start))
 

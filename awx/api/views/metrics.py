@@ -35,9 +35,9 @@ class MetricsView(APIView):
         '''Show Metrics Details'''
         if request.user.is_superuser or request.user.is_system_auditor:
             metrics_to_show = ''
-            if not request.query_params.get('subsystemonly', "0") == "1":
+            if request.query_params.get('subsystemonly', "0") != "1":
                 metrics_to_show += metrics().decode('UTF-8')
-            if not request.query_params.get('dbonly', "0") == "1":
+            if request.query_params.get('dbonly', "0") != "1":
                 metrics_to_show += s_metrics.metrics(request)
             return Response(metrics_to_show)
         raise PermissionDenied()

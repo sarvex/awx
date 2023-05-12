@@ -23,8 +23,9 @@ class TokenView(views.TokenView):
         # This code detects and auto-expires them on refresh grant
         # requests.
         if request.POST.get('grant_type') == 'refresh_token' and 'refresh_token' in request.POST:
-            refresh_token = RefreshToken.objects.filter(token=request.POST['refresh_token']).first()
-            if refresh_token:
+            if refresh_token := RefreshToken.objects.filter(
+                token=request.POST['refresh_token']
+            ).first():
                 expire_seconds = settings.OAUTH2_PROVIDER.get('REFRESH_TOKEN_EXPIRE_SECONDS', 0)
                 if refresh_token.created + timedelta(seconds=expire_seconds) < now():
                     return request.build_absolute_uri(), {}, 'The refresh token has expired.', '403'

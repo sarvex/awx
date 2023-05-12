@@ -10,6 +10,8 @@ from django.db import models
 import awx.main.fields
 
 
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -98,8 +100,7 @@ class Migration(migrations.Migration):
             name='vault_password',
         ),
         migrations.AlterUniqueTogether(
-            name='credentialtype',
-            unique_together=set([('name', 'kind')]),
+            name='credentialtype', unique_together={('name', 'kind')}
         ),
         migrations.AlterField(
             model_name='credential',

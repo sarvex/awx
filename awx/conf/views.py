@@ -85,14 +85,14 @@ class SettingSingletonDetail(RetrieveUpdateDestroyAPIView):
     def get_object(self):
         settings_qs = self.get_queryset()
         registered_settings = settings_registry.get_registered_settings(category_slug=self.category_slug)
-        all_settings = {}
-        for setting in settings_qs:
-            all_settings[setting.key] = setting.value
+        all_settings = {setting.key: setting.value for setting in settings_qs}
         for key in registered_settings:
             if key in all_settings or self.category_slug == 'changed':
                 continue
             try:
-                field = settings_registry.get_setting_field(key, for_user=bool(self.category_slug == 'user'))
+                field = settings_registry.get_setting_field(
+                    key, for_user=self.category_slug == 'user'
+                )
                 all_settings[key] = field.get_default()
             except serializers.SkipField:
                 all_settings[key] = None
@@ -140,7 +140,7 @@ class SettingSingletonDetail(RetrieveUpdateDestroyAPIView):
         # When TOWER_URL_BASE is deleted from the API, reset it to the hostname
         # used to make the request as a default.
         if hasattr(instance, 'TOWER_URL_BASE'):
-            url = '{}://{}'.format(self.request.scheme, self.request.get_host())
+            url = f'{self.request.scheme}://{self.request.get_host()}'
             if settings.TOWER_URL_BASE != url:
                 settings.TOWER_URL_BASE = url
 
@@ -176,16 +176,17 @@ class SettingLoggingTest(GenericAPIView):
         except subprocess.CalledProcessError as exc:
             return Response({'error': exc.output}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Check to ensure port is open at host
-        if protocol in ['udp', 'tcp']:
-            port = getattr(settings, 'LOG_AGGREGATOR_PORT', None)
-            # Error if port is not set when using UDP/TCP
-            if not port:
-                return Response({'error': 'Port required for ' + protocol}, status=status.HTTP_400_BAD_REQUEST)
-        else:
+        if protocol not in ['udp', 'tcp']:
             # if http/https by this point, domain is reacheable
             return Response(status=status.HTTP_202_ACCEPTED)
 
+        port = getattr(settings, 'LOG_AGGREGATOR_PORT', None)
+            # Error if port is not set when using UDP/TCP
+        if not port:
+            return Response(
+                {'error': f'Port required for {protocol}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if protocol == 'udp':
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         else:

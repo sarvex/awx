@@ -34,29 +34,41 @@ class Migration(migrations.Migration):
     replaces = replaces()
 
     operations = [
-        # Release UJT unique_together constraint
         migrations.AlterUniqueTogether(
             name='unifiedjobtemplate',
             unique_together=set([]),
         ),
-        # Inventory Refresh
         migrations.RenameField('InventorySource', 'group', 'deprecated_group'),
         migrations.AlterField(
             model_name='inventorysource',
             name='deprecated_group',
-            field=models.OneToOneField(related_name='deprecated_inventory_source', on_delete=models.CASCADE, null=True, default=None, to='main.Group'),
+            field=models.OneToOneField(
+                related_name='deprecated_inventory_source',
+                on_delete=models.CASCADE,
+                null=True,
+                default=None,
+                to='main.Group',
+            ),
         ),
         migrations.AlterField(
             model_name='inventorysource',
             name='inventory',
-            field=models.ForeignKey(related_name='inventory_sources', default=None, to='main.Inventory', on_delete=models.CASCADE, null=True),
+            field=models.ForeignKey(
+                related_name='inventory_sources',
+                default=None,
+                to='main.Inventory',
+                on_delete=models.CASCADE,
+                null=True,
+            ),
         ),
-        # Smart Inventory
         migrations.AddField(
             model_name='inventory',
             name='host_filter',
             field=awx.main.fields.SmartFilterField(
-                default=None, help_text='Filter that will be applied to the hosts of this inventory.', null=True, blank=True
+                default=None,
+                help_text='Filter that will be applied to the hosts of this inventory.',
+                null=True,
+                blank=True,
             ),
         ),
         migrations.AddField(
@@ -67,60 +79,104 @@ class Migration(migrations.Migration):
                 help_text='Kind of inventory being represented.',
                 max_length=32,
                 blank=True,
-                choices=[('', 'Hosts have a direct link to this inventory.'), ('smart', 'Hosts for inventory generated using the host_filter property.')],
+                choices=[
+                    ('', 'Hosts have a direct link to this inventory.'),
+                    (
+                        'smart',
+                        'Hosts for inventory generated using the host_filter property.',
+                    ),
+                ],
             ),
         ),
         migrations.CreateModel(
             name='SmartInventoryMembership',
             fields=[
-                ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
-                ('host', models.ForeignKey(related_name='+', on_delete=models.CASCADE, to='main.Host')),
+                (
+                    'id',
+                    models.AutoField(
+                        verbose_name='ID',
+                        serialize=False,
+                        auto_created=True,
+                        primary_key=True,
+                    ),
+                ),
+                (
+                    'host',
+                    models.ForeignKey(
+                        related_name='+',
+                        on_delete=models.CASCADE,
+                        to='main.Host',
+                    ),
+                ),
             ],
         ),
         migrations.AddField(
             model_name='smartinventorymembership',
             name='inventory',
-            field=models.ForeignKey(on_delete=models.CASCADE, related_name='+', to='main.Inventory'),
+            field=models.ForeignKey(
+                on_delete=models.CASCADE, related_name='+', to='main.Inventory'
+            ),
         ),
         migrations.AddField(
             model_name='host',
             name='smart_inventories',
-            field=models.ManyToManyField(related_name='_host_smart_inventories_+', through='main.SmartInventoryMembership', to='main.Inventory'),
+            field=models.ManyToManyField(
+                related_name='_host_smart_inventories_+',
+                through='main.SmartInventoryMembership',
+                to='main.Inventory',
+            ),
         ),
         migrations.AlterUniqueTogether(
             name='smartinventorymembership',
-            unique_together=set([('host', 'inventory')]),
+            unique_together={('host', 'inventory')},
         ),
-        # Background Inventory deletion
         migrations.AddField(
             model_name='inventory',
             name='pending_deletion',
-            field=models.BooleanField(default=False, help_text='Flag indicating the inventory is being deleted.', editable=False),
+            field=models.BooleanField(
+                default=False,
+                help_text='Flag indicating the inventory is being deleted.',
+                editable=False,
+            ),
         ),
         migrations.AlterField(
             model_name='inventory',
             name='organization',
             field=models.ForeignKey(
-                related_name='inventories', on_delete=models.SET_NULL, to='main.Organization', help_text='Organization containing this inventory.', null=True
+                related_name='inventories',
+                on_delete=models.SET_NULL,
+                to='main.Organization',
+                help_text='Organization containing this inventory.',
+                null=True,
             ),
         ),
-        # Facts
         migrations.AlterField(
             model_name='fact',
             name='facts',
             field=awx.main.fields.JSONBField(
-                default=dict, help_text='Arbitrary JSON structure of module facts captured at timestamp for a single host.', blank=True
+                default=dict,
+                help_text='Arbitrary JSON structure of module facts captured at timestamp for a single host.',
+                blank=True,
             ),
         ),
         migrations.AddField(
             model_name='host',
             name='ansible_facts',
-            field=awx.main.fields.JSONBField(default=dict, help_text='Arbitrary JSON structure of most recent ansible_facts, per-host.', blank=True),
+            field=awx.main.fields.JSONBField(
+                default=dict,
+                help_text='Arbitrary JSON structure of most recent ansible_facts, per-host.',
+                blank=True,
+            ),
         ),
         migrations.AddField(
             model_name='host',
             name='ansible_facts_modified',
-            field=models.DateTimeField(default=None, help_text='The date and time ansible_facts was last modified.', null=True, editable=False),
+            field=models.DateTimeField(
+                default=None,
+                help_text='The date and time ansible_facts was last modified.',
+                null=True,
+                editable=False,
+            ),
         ),
         migrations.AddField(
             model_name='job',
@@ -139,14 +195,21 @@ class Migration(migrations.Migration):
             ),
         ),
         migrations.RunSQL(
-            [("CREATE INDEX host_ansible_facts_default_gin ON %s USING gin" "(ansible_facts jsonb_path_ops);", [AsIs(Host._meta.db_table)])],
+            [
+                (
+                    "CREATE INDEX host_ansible_facts_default_gin ON %s USING gin"
+                    "(ansible_facts jsonb_path_ops);",
+                    [AsIs(Host._meta.db_table)],
+                )
+            ],
             [('DROP INDEX host_ansible_facts_default_gin;', None)],
         ),
-        # SCM file-based inventories
         migrations.AddField(
             model_name='inventorysource',
             name='scm_last_revision',
-            field=models.CharField(default='', max_length=1024, editable=False, blank=True),
+            field=models.CharField(
+                default='', max_length=1024, editable=False, blank=True
+            ),
         ),
         migrations.AddField(
             model_name='inventorysource',
@@ -263,7 +326,6 @@ class Migration(migrations.Migration):
             name='update_on_project_update',
             field=models.BooleanField(default=False),
         ),
-        # Named URL
         migrations.AlterField(
             model_name='notificationtemplate',
             name='name',
@@ -272,30 +334,48 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='notificationtemplate',
             name='organization',
-            field=models.ForeignKey(related_name='notification_templates', on_delete=models.CASCADE, to='main.Organization', null=True),
+            field=models.ForeignKey(
+                related_name='notification_templates',
+                on_delete=models.CASCADE,
+                to='main.Organization',
+                null=True,
+            ),
         ),
         migrations.AlterUniqueTogether(
             name='notificationtemplate',
-            unique_together=set([('organization', 'name')]),
+            unique_together={('organization', 'name')},
         ),
-        # Add verbosity option to inventory updates
         migrations.AddField(
             model_name='inventorysource',
             name='verbosity',
-            field=models.PositiveIntegerField(default=1, blank=True, choices=[(0, '0 (WARNING)'), (1, '1 (INFO)'), (2, '2 (DEBUG)')]),
+            field=models.PositiveIntegerField(
+                default=1,
+                blank=True,
+                choices=[
+                    (0, '0 (WARNING)'),
+                    (1, '1 (INFO)'),
+                    (2, '2 (DEBUG)'),
+                ],
+            ),
         ),
         migrations.AddField(
             model_name='inventoryupdate',
             name='verbosity',
-            field=models.PositiveIntegerField(default=1, blank=True, choices=[(0, '0 (WARNING)'), (1, '1 (INFO)'), (2, '2 (DEBUG)')]),
+            field=models.PositiveIntegerField(
+                default=1,
+                blank=True,
+                choices=[
+                    (0, '0 (WARNING)'),
+                    (1, '1 (INFO)'),
+                    (2, '2 (DEBUG)'),
+                ],
+            ),
         ),
-        # Job Templates
         migrations.AddField(
             model_name='jobtemplate',
             name='ask_verbosity_on_launch',
             field=models.BooleanField(default=False),
         ),
-        # Workflows
         migrations.AddField(
             model_name='workflowjob',
             name='allow_simultaneous',
@@ -306,7 +386,6 @@ class Migration(migrations.Migration):
             name='allow_simultaneous',
             field=models.BooleanField(default=False),
         ),
-        # Permission and Deprecated Field Removal
         migrations.RemoveField(
             model_name='permission',
             name='created_by',
@@ -370,11 +449,16 @@ class Migration(migrations.Migration):
         migrations.DeleteModel(
             name='Permission',
         ),
-        # Insights
         migrations.AddField(
             model_name='host',
             name='insights_system_id',
-            field=models.TextField(default=None, help_text='Red Hat Insights host unique identifier.', null=True, db_index=True, blank=True),
+            field=models.TextField(
+                default=None,
+                help_text='Red Hat Insights host unique identifier.',
+                null=True,
+                db_index=True,
+                blank=True,
+            ),
         ),
         migrations.AddField(
             model_name='inventory',
@@ -397,39 +481,68 @@ class Migration(migrations.Migration):
                 help_text='Kind of inventory being represented.',
                 max_length=32,
                 blank=True,
-                choices=[('', 'Hosts have a direct link to this inventory.'), ('smart', 'Hosts for inventory generated using the host_filter property.')],
+                choices=[
+                    ('', 'Hosts have a direct link to this inventory.'),
+                    (
+                        'smart',
+                        'Hosts for inventory generated using the host_filter property.',
+                    ),
+                ],
             ),
         ),
-        # Timeout help text update
         migrations.AlterField(
             model_name='inventorysource',
             name='timeout',
-            field=models.IntegerField(default=0, help_text='The amount of time (in seconds) to run before the task is canceled.', blank=True),
+            field=models.IntegerField(
+                default=0,
+                help_text='The amount of time (in seconds) to run before the task is canceled.',
+                blank=True,
+            ),
         ),
         migrations.AlterField(
             model_name='inventoryupdate',
             name='timeout',
-            field=models.IntegerField(default=0, help_text='The amount of time (in seconds) to run before the task is canceled.', blank=True),
+            field=models.IntegerField(
+                default=0,
+                help_text='The amount of time (in seconds) to run before the task is canceled.',
+                blank=True,
+            ),
         ),
         migrations.AlterField(
             model_name='job',
             name='timeout',
-            field=models.IntegerField(default=0, help_text='The amount of time (in seconds) to run before the task is canceled.', blank=True),
+            field=models.IntegerField(
+                default=0,
+                help_text='The amount of time (in seconds) to run before the task is canceled.',
+                blank=True,
+            ),
         ),
         migrations.AlterField(
             model_name='jobtemplate',
             name='timeout',
-            field=models.IntegerField(default=0, help_text='The amount of time (in seconds) to run before the task is canceled.', blank=True),
+            field=models.IntegerField(
+                default=0,
+                help_text='The amount of time (in seconds) to run before the task is canceled.',
+                blank=True,
+            ),
         ),
         migrations.AlterField(
             model_name='project',
             name='timeout',
-            field=models.IntegerField(default=0, help_text='The amount of time (in seconds) to run before the task is canceled.', blank=True),
+            field=models.IntegerField(
+                default=0,
+                help_text='The amount of time (in seconds) to run before the task is canceled.',
+                blank=True,
+            ),
         ),
         migrations.AlterField(
             model_name='projectupdate',
             name='timeout',
-            field=models.IntegerField(default=0, help_text='The amount of time (in seconds) to run before the task is canceled.', blank=True),
+            field=models.IntegerField(
+                default=0,
+                help_text='The amount of time (in seconds) to run before the task is canceled.',
+                blank=True,
+            ),
         ),
         migrations.AddField(
             model_name='adhoccommand',
@@ -445,22 +558,38 @@ class Migration(migrations.Migration):
             model_name='job',
             name='diff_mode',
             field=models.BooleanField(
-                default=False, help_text='If enabled, textual changes made to any templated files on the host are shown in the standard output'
+                default=False,
+                help_text='If enabled, textual changes made to any templated files on the host are shown in the standard output',
             ),
         ),
         migrations.AddField(
             model_name='jobtemplate',
             name='diff_mode',
             field=models.BooleanField(
-                default=False, help_text='If enabled, textual changes made to any templated files on the host are shown in the standard output'
+                default=False,
+                help_text='If enabled, textual changes made to any templated files on the host are shown in the standard output',
             ),
         ),
         migrations.CreateModel(
             name='CredentialType',
             fields=[
-                ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
-                ('created', models.DateTimeField(default=None, editable=False)),
-                ('modified', models.DateTimeField(default=None, editable=False)),
+                (
+                    'id',
+                    models.AutoField(
+                        verbose_name='ID',
+                        serialize=False,
+                        auto_created=True,
+                        primary_key=True,
+                    ),
+                ),
+                (
+                    'created',
+                    models.DateTimeField(default=None, editable=False),
+                ),
+                (
+                    'modified',
+                    models.DateTimeField(default=None, editable=False),
+                ),
                 ('description', models.TextField(default='', blank=True)),
                 ('name', models.CharField(max_length=512)),
                 (
@@ -477,7 +606,10 @@ class Migration(migrations.Migration):
                         ],
                     ),
                 ),
-                ('managed_by_tower', models.BooleanField(default=False, editable=False)),
+                (
+                    'managed_by_tower',
+                    models.BooleanField(default=False, editable=False),
+                ),
                 (
                     'inputs',
                     awx.main.fields.CredentialTypeInputField(
@@ -519,7 +651,11 @@ class Migration(migrations.Migration):
                 (
                     'tags',
                     taggit.managers.TaggableManager(
-                        to='taggit.Tag', through='taggit.TaggedItem', blank=True, help_text='A comma-separated list of tags.', verbose_name='Tags'
+                        to='taggit.Tag',
+                        through='taggit.TaggedItem',
+                        blank=True,
+                        help_text='A comma-separated list of tags.',
+                        verbose_name='Tags',
                     ),
                 ),
             ],
@@ -534,41 +670,63 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='credential',
             name='inputs',
-            field=awx.main.fields.CredentialInputField(default=dict, blank=True),
+            field=awx.main.fields.CredentialInputField(
+                default=dict, blank=True
+            ),
         ),
         migrations.AddField(
             model_name='credential',
             name='credential_type',
-            field=models.ForeignKey(related_name='credentials', on_delete=models.CASCADE, to='main.CredentialType', null=True),
+            field=models.ForeignKey(
+                related_name='credentials',
+                on_delete=models.CASCADE,
+                to='main.CredentialType',
+                null=True,
+            ),
             preserve_default=False,
         ),
         migrations.AddField(
             model_name='job',
             name='vault_credential',
             field=models.ForeignKey(
-                related_name='jobs_as_vault_credential+', on_delete=models.SET_NULL, default=None, blank=True, to='main.Credential', null=True
+                related_name='jobs_as_vault_credential+',
+                on_delete=models.SET_NULL,
+                default=None,
+                blank=True,
+                to='main.Credential',
+                null=True,
             ),
         ),
         migrations.AddField(
             model_name='jobtemplate',
             name='vault_credential',
             field=models.ForeignKey(
-                related_name='jobtemplates_as_vault_credential+', on_delete=models.SET_NULL, default=None, blank=True, to='main.Credential', null=True
+                related_name='jobtemplates_as_vault_credential+',
+                on_delete=models.SET_NULL,
+                default=None,
+                blank=True,
+                to='main.Credential',
+                null=True,
             ),
         ),
         migrations.AddField(
             model_name='job',
             name='extra_credentials',
-            field=models.ManyToManyField(related_name='_job_extra_credentials_+', to='main.Credential'),
+            field=models.ManyToManyField(
+                related_name='_job_extra_credentials_+', to='main.Credential'
+            ),
         ),
         migrations.AddField(
             model_name='jobtemplate',
             name='extra_credentials',
-            field=models.ManyToManyField(related_name='_jobtemplate_extra_credentials_+', to='main.Credential'),
+            field=models.ManyToManyField(
+                related_name='_jobtemplate_extra_credentials_+',
+                to='main.Credential',
+            ),
         ),
         migrations.AlterUniqueTogether(
             name='credential',
-            unique_together=set([('organization', 'name', 'credential_type')]),
+            unique_together={('organization', 'name', 'credential_type')},
         ),
         migrations.AlterField(
             model_name='credential',
@@ -590,7 +748,6 @@ class Migration(migrations.Migration):
                 ],
             ),
         ),
-        # Connecting activity stream
         migrations.AddField(
             model_name='activitystream',
             name='credential_type',
@@ -599,7 +756,15 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='InstanceGroup',
             fields=[
-                ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                (
+                    'id',
+                    models.AutoField(
+                        verbose_name='ID',
+                        serialize=False,
+                        auto_created=True,
+                        primary_key=True,
+                    ),
+                ),
                 ('name', models.CharField(unique=True, max_length=250)),
                 ('created', models.DateTimeField(auto_now_add=True)),
                 ('modified', models.DateTimeField(auto_now=True)),
@@ -618,7 +783,10 @@ class Migration(migrations.Migration):
                 (
                     'instances',
                     models.ManyToManyField(
-                        help_text='Instances that are members of this InstanceGroup', related_name='rampart_groups', editable=False, to='main.Instance'
+                        help_text='Instances that are members of this InstanceGroup',
+                        related_name='rampart_groups',
+                        editable=False,
+                        to='main.Instance',
                     ),
                 ),
             ],
@@ -632,7 +800,12 @@ class Migration(migrations.Migration):
             model_name='unifiedjob',
             name='instance_group',
             field=models.ForeignKey(
-                on_delete=models.SET_NULL, default=None, blank=True, to='main.InstanceGroup', help_text='The Instance group the job was run under', null=True
+                on_delete=models.SET_NULL,
+                default=None,
+                blank=True,
+                to='main.InstanceGroup',
+                help_text='The Instance group the job was run under',
+                null=True,
             ),
         ),
         migrations.AddField(
@@ -655,16 +828,21 @@ class Migration(migrations.Migration):
             name='last_isolated_check',
             field=models.DateTimeField(editable=False, null=True),
         ),
-        # Migrations that don't change db schema but simply to make Django ORM happy.
-        # e.g. Choice updates, help_text updates, etc.
         migrations.AlterField(
             model_name='schedule',
             name='enabled',
-            field=models.BooleanField(default=True, help_text='Enables processing of this schedule.'),
+            field=models.BooleanField(
+                default=True, help_text='Enables processing of this schedule.'
+            ),
         ),
         migrations.AlterField(
             model_name='unifiedjob',
             name='execution_node',
-            field=models.TextField(default='', help_text='The node the job executed on.', editable=False, blank=True),
+            field=models.TextField(
+                default='',
+                help_text='The node the job executed on.',
+                editable=False,
+                blank=True,
+            ),
         ),
     ]

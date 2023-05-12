@@ -60,14 +60,16 @@ class RegisterQueue:
             if instance.exists():
                 instances.append(instance[0])
             else:
-                raise InstanceNotFound("Instance does not exist or cannot run jobs: {}".format(inst_name), changed)
+                raise InstanceNotFound(
+                    f"Instance does not exist or cannot run jobs: {inst_name}",
+                    changed,
+                )
 
         ig.instances.add(*instances)
 
         instance_list_before = ig.policy_instance_list
         instance_list_after = instance_list_unique
-        new_instances = set(instance_list_after) - set(instance_list_before)
-        if new_instances:
+        if new_instances := set(instance_list_after) - set(instance_list_before):
             changed = True
             ig.policy_instance_list = ig.policy_instance_list + list(new_instances)
             ig.save()
@@ -80,14 +82,14 @@ class RegisterQueue:
                 changed2 = False
                 (ig, created, changed1) = self.get_create_update_instance_group()
                 if created:
-                    print("Creating instance group {}".format(ig.name))
-                elif not created:
-                    print("Instance Group already registered {}".format(ig.name))
+                    print(f"Creating instance group {ig.name}")
+                else:
+                    print(f"Instance Group already registered {ig.name}")
 
                 try:
                     (instances, changed2) = self.add_instances_to_group(ig)
                     for i in instances:
-                        print("Added instance {} to {}".format(i.hostname, ig.name))
+                        print(f"Added instance {i.hostname} to {ig.name}")
                 except InstanceNotFound as e:
                     self.instance_not_found_err = e
 

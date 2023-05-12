@@ -65,12 +65,11 @@ def validate_pem(data, min_keys=0, max_keys=None, min_certs=0, max_certs=None):
             raise ValidationError(_('Invalid certificate or key: %s...') % data[:100])
 
         # The rest of the PEM data to process
-        data = match.group('next').lstrip()
+        data = match['next'].lstrip()
 
         # Check PEM object type, check key type if private key.
-        pem_obj_info = {}
-        pem_obj_info['all'] = match.group(0)
-        pem_obj_info['type'] = pem_obj_type = match.group('type')
+        pem_obj_info = {'all': match[0]}
+        pem_obj_info['type'] = pem_obj_type = match['type']
         if pem_obj_type.endswith('PRIVATE KEY'):
             key_count += 1
             pem_obj_info['type'] = 'PRIVATE KEY'
@@ -85,7 +84,7 @@ def validate_pem(data, min_keys=0, max_keys=None, min_certs=0, max_certs=None):
             raise ValidationError(_('Unsupported PEM object type: "%s"') % pem_obj_type)
 
         # Ensure that this PEM object is valid base64 data.
-        pem_obj_info['data'] = match.group('data')
+        pem_obj_info['data'] = match['data']
         base64_data = ''
         line_continues = False
         for line in pem_obj_info['data'].splitlines():
@@ -95,8 +94,7 @@ def validate_pem(data, min_keys=0, max_keys=None, min_certs=0, max_certs=None):
             if line_continues:
                 line_continues = line.endswith('\\')
                 continue
-            line_match = pem_obj_header_re.match(line)
-            if line_match:
+            if line_match := pem_obj_header_re.match(line):
                 line_continues = line.endswith('\\')
                 continue
             base64_data += line
@@ -116,23 +114,22 @@ def validate_pem(data, min_keys=0, max_keys=None, min_certs=0, max_certs=None):
             # length field, followed by the ciphername -- if ciphername is anything
             # other than 'none' the key is encrypted.
             pem_obj_info['key_enc'] = not bool(pem_obj_info['bin'].startswith(b'openssh-key-v1\x00\x00\x00\x00\x04none'))
-        elif match.group('type') == 'ENCRYPTED PRIVATE KEY':
+        elif match['type'] == 'ENCRYPTED PRIVATE KEY':
             pem_obj_info['key_enc'] = True
         elif pem_obj_info.get('key_type', ''):
-            pem_obj_info['key_enc'] = bool('ENCRYPTED' in pem_obj_info['data'])
+            pem_obj_info['key_enc'] = 'ENCRYPTED' in pem_obj_info['data']
 
         pem_objects.append(pem_obj_info)
 
     # Validate that the number of keys and certs provided are within the limits.
     key_count_dict = dict(min_keys=min_keys, max_keys=max_keys, key_count=key_count)
     if key_count < min_keys:
-        if min_keys == 1:
-            if max_keys == min_keys:
-                raise ValidationError(_('Exactly one private key is required.'))
-            else:
-                raise ValidationError(_('At least one private key is required.'))
-        else:
+        if min_keys != 1:
             raise ValidationError(_('At least %(min_keys)d private keys are required, only %(key_count)d provided.') % key_count_dict)
+        if max_keys == min_keys:
+            raise ValidationError(_('Exactly one private key is required.'))
+        else:
+            raise ValidationError(_('At least one private key is required.'))
     elif max_keys is not None and key_count > max_keys:
         if max_keys == 1:
             raise ValidationError(_('Only one private key is allowed, %(key_count)d provided.') % key_count_dict)
@@ -140,13 +137,12 @@ def validate_pem(data, min_keys=0, max_keys=None, min_certs=0, max_certs=None):
             raise ValidationError(_('No more than %(max_keys)d private keys are allowed, %(key_count)d provided.') % key_count_dict)
     cert_count_dict = dict(min_certs=min_certs, max_certs=max_certs, cert_count=cert_count)
     if cert_count < min_certs:
-        if min_certs == 1:
-            if max_certs == min_certs:
-                raise ValidationError(_('Exactly one certificate is required.'))
-            else:
-                raise ValidationError(_('At least one certificate is required.'))
-        else:
+        if min_certs != 1:
             raise ValidationError(_('At least %(min_certs)d certificates are required, only %(cert_count)d provided.') % cert_count_dict)
+        if max_certs == min_certs:
+            raise ValidationError(_('Exactly one certificate is required.'))
+        else:
+            raise ValidationError(_('At least one certificate is required.'))
     elif max_certs is not None and cert_count > max_certs:
         if max_certs == 1:
             raise ValidationError(_('Only one certificate is allowed, %(cert_count)d provided.') % cert_count_dict)
@@ -169,9 +165,9 @@ def validate_certificate(data):
     if necessary.
     """
     if 'BEGIN ' not in data:
-        data = "-----BEGIN CERTIFICATE-----\n{}".format(data)
+        data = f"-----BEGIN CERTIFICATE-----\n{data}"
     if 'END ' not in data:
-        data = "{}\n-----END CERTIFICATE-----\n".format(data)
+        data = f"{data}\n-----END CERTIFICATE-----\n"
     return validate_pem(data, max_keys=0, min_certs=1)
 
 

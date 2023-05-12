@@ -34,12 +34,12 @@ class Command(BaseCommand):
 
     @classmethod
     def _format_lines(cls, host_stats, padding=5):
-        widths = [0 for i in host_stats[0]]
+        widths = [0 for _ in host_stats[0]]
         for entry in host_stats:
             for i, e in enumerate(entry):
                 if Command.display_len(e) > widths[i]:
                     widths[i] = Command.display_len(e)
-        paddings = [padding for i in widths]
+        paddings = [padding for _ in widths]
 
         lines = []
         for entry in host_stats:
@@ -115,11 +115,11 @@ class Command(BaseCommand):
 
         try:
             me = Instance.objects.me()
-            logger.info('Active instance with hostname {} is registered.'.format(me.hostname))
+            logger.info(f'Active instance with hostname {me.hostname} is registered.')
         except RuntimeError as e:
             # the CLUSTER_HOST_ID in the task, and web instance must match and
             # ensure network connectivity between the task and web instance
-            logger.info('Unable to return currently active instance: {}, retry in 5s...'.format(e))
+            logger.info(f'Unable to return currently active instance: {e}, retry in 5s...')
             time.sleep(5)
             return
 

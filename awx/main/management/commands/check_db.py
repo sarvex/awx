@@ -14,4 +14,4 @@ class Command(BaseCommand):
             cursor.execute("SELECT version()")
             version = str(cursor.fetchone()[0])
 
-        return "Database Version: {}".format(version)
+        return f"Database Version: {version}"

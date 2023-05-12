@@ -142,7 +142,7 @@ class PoolWorker(object):
                 # when this occurs, it's _fine_ to ignore this KeyError because
                 # the purpose of self.managed_tasks is to just track internal
                 # state of which events are *currently* being processed.
-                logger.warn('Event UUID {} appears to be have been duplicated.'.format(uuid))
+                logger.warn(f'Event UUID {uuid} appears to be have been duplicated.')
 
     @property
     def current_task(self):
@@ -177,7 +177,9 @@ class PoolWorker(object):
                 except QueueEmpty:
                     break  # qsize is not always _totally_ up to date
             if len(orphaned):
-                logger.error('requeuing {} messages from gone worker pid:{}'.format(len(orphaned), self.pid))
+                logger.error(
+                    f'requeuing {len(orphaned)} messages from gone worker pid:{self.pid}'
+                )
         return orphaned
 
     @property
@@ -232,7 +234,7 @@ class WorkerPool(object):
     def init_workers(self, target, *target_args):
         self.target = target
         self.target_args = target_args
-        for idx in range(self.min_workers):
+        for _ in range(self.min_workers):
             self.up()
 
     def up(self):
@@ -249,7 +251,7 @@ class WorkerPool(object):
         except Exception:
             logger.exception('could not fork')
         else:
-            logger.debug('scaling up worker pid:{}'.format(worker.pid))
+            logger.debug(f'scaling up worker pid:{worker.pid}')
         return idx, worker
 
     def debug(self, *args, **kwargs):
@@ -291,10 +293,12 @@ class WorkerPool(object):
                 pass
             except Exception:
                 tb = traceback.format_exc()
-                logger.warn("could not write to queue %s" % preferred_queue)
-                logger.warn("detail: {}".format(tb))
+                logger.warn(f"could not write to queue {preferred_queue}")
+                logger.warn(f"detail: {tb}")
             write_attempt_order.append(preferred_queue)
-        logger.error("could not write payload to any queue, attempted order: {}".format(write_attempt_order))
+        logger.error(
+            f"could not write payload to any queue, attempted order: {write_attempt_order}"
+        )
         return None
 
     def stop(self, signum):
@@ -302,7 +306,7 @@ class WorkerPool(object):
             for worker in self.workers:
                 os.kill(worker.pid, signum)
         except Exception:
-            logger.exception('could not kill {}'.format(worker.pid))
+            logger.exception(f'could not kill {worker.pid}')
 
 
 class AutoscalePool(WorkerPool):
@@ -340,7 +344,7 @@ class AutoscalePool(WorkerPool):
             # If we don't have at least min_workers, add more
             return True
         # If every worker is busy doing something, add more
-        return all([w.busy for w in self.workers])
+        return all(w.busy for w in self.workers)
 
     @property
     def full(self):
@@ -348,7 +352,7 @@ class AutoscalePool(WorkerPool):
 
     @property
     def debug_meta(self):
-        return 'min={} max={}'.format(self.min_workers, self.max_workers)
+        return f'min={self.min_workers} max={self.max_workers}'
 
     def cleanup(self):
         """
@@ -374,14 +378,13 @@ class AutoscalePool(WorkerPool):
                 #    callbacks
                 # 2. take any pending tasks delivered to its queue and
                 #    send them to another worker
-                logger.error('worker pid:{} is gone (exit={})'.format(w.pid, w.exitcode))
-                if w.current_task:
-                    if w.current_task != 'QUIT':
-                        try:
-                            for j in UnifiedJob.objects.filter(celery_task_id=w.current_task['uuid']):
-                                reaper.reap_job(j, 'failed')
-                        except Exception:
-                            logger.exception('failed to reap job UUID {}'.format(w.current_task['uuid']))
+                logger.error(f'worker pid:{w.pid} is gone (exit={w.exitcode})')
+                if w.current_task and w.current_task != 'QUIT':
+                    try:
+                        for j in UnifiedJob.objects.filter(celery_task_id=w.current_task['uuid']):
+                            reaper.reap_job(j, 'failed')
+                    except Exception:
+                        logger.exception(f"failed to reap job UUID {w.current_task['uuid']}")
                 orphaned.extend(w.orphaned_tasks)
                 self.workers.remove(w)
             elif w.idle and len(self.workers) > self.min_workers:
@@ -389,7 +392,7 @@ class AutoscalePool(WorkerPool):
                 # more processes in the pool than we need (> min)
                 # send this process a message so it will exit gracefully
                 # at the next opportunity
-                logger.debug('scaling down worker pid:{}'.format(w.pid))
+                logger.debug(f'scaling down worker pid:{w.pid}')
                 w.quit()
                 self.workers.remove(w)
             if w.alive:
@@ -399,15 +402,20 @@ class AutoscalePool(WorkerPool):
                 # deadlocks or other serious issues in the task manager that cause
                 # the task manager to never do more work
                 current_task = w.current_task
-                if current_task and isinstance(current_task, dict):
-                    if current_task.get('task', '').endswith('tasks.run_task_manager'):
-                        if 'started' not in current_task:
-                            w.managed_tasks[current_task['uuid']]['started'] = time.time()
-                        age = time.time() - current_task['started']
-                        w.managed_tasks[current_task['uuid']]['age'] = age
-                        if age > (60 * 5):
-                            logger.error(f'run_task_manager has held the advisory lock for >5m, sending SIGTERM to {w.pid}')  # noqa
-                            os.kill(w.pid, signal.SIGTERM)
+                if (
+                    current_task
+                    and isinstance(current_task, dict)
+                    and current_task.get('task', '').endswith(
+                        'tasks.run_task_manager'
+                    )
+                ):
+                    if 'started' not in current_task:
+                        w.managed_tasks[current_task['uuid']]['started'] = time.time()
+                    age = time.time() - current_task['started']
+                    w.managed_tasks[current_task['uuid']]['age'] = age
+                    if age > (60 * 5):
+                        logger.error(f'run_task_manager has held the advisory lock for >5m, sending SIGTERM to {w.pid}')  # noqa
+                        os.kill(w.pid, signal.SIGTERM)
 
         for m in orphaned:
             # if all the workers are dead, spawn at least one
@@ -425,13 +433,12 @@ class AutoscalePool(WorkerPool):
         reaper.reap(excluded_uuids=running_uuids)
 
     def up(self):
-        if self.full:
-            # if we can't spawn more workers, just toss this message into a
-            # random worker's backlog
-            idx = random.choice(range(len(self.workers)))
-            return idx, self.workers[idx]
-        else:
+        if not self.full:
             return super(AutoscalePool, self).up()
+        # if we can't spawn more workers, just toss this message into a
+        # random worker's backlog
+        idx = random.choice(range(len(self.workers)))
+        return idx, self.workers[idx]
 
     def write(self, preferred_queue, body):
         if 'guid' in body:

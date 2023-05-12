@@ -106,9 +106,9 @@ class BaseModel(models.Model):
 
     def __str__(self):
         if 'name' in self.__dict__:
-            return u'%s-%s' % (self.name, self.pk)
+            return f'{self.name}-{self.pk}'
         else:
-            return u'%s-%s' % (self._meta.verbose_name, self.pk)
+            return f'{self._meta.verbose_name}-{self.pk}'
 
     def clean_fields(self, exclude=None):
         """
@@ -124,9 +124,9 @@ class BaseModel(models.Model):
         for f in self._meta.fields:
             if f.name in exclude:
                 continue
-            if hasattr(self, 'clean_%s' % f.name):
+            if hasattr(self, f'clean_{f.name}'):
                 try:
-                    setattr(self, f.name, getattr(self, 'clean_%s' % f.name)())
+                    setattr(self, f.name, getattr(self, f'clean_{f.name}')())
                 except ValidationError as e:
                     errors[f.name] = e.messages
         if errors:
@@ -201,7 +201,7 @@ class PasswordFieldsModel(BaseModel):
         for field in self.PASSWORD_FIELDS:
             if new_instance:
                 value = getattr(self, field, '')
-                setattr(self, '_saved_%s' % field, value)
+                setattr(self, f'_saved_{field}', value)
                 setattr(self, field, '')
             else:
                 ask = self._password_field_allows_ask(field)
@@ -213,7 +213,7 @@ class PasswordFieldsModel(BaseModel):
         if new_instance:
             update_fields = []
             for field in self.PASSWORD_FIELDS:
-                saved_value = getattr(self, '_saved_%s' % field, '')
+                saved_value = getattr(self, f'_saved_{field}', '')
                 setattr(self, field, saved_value)
                 self.mark_field_for_save(update_fields, field)
 
@@ -258,13 +258,9 @@ class HasEditsMixin(BaseModel):
         return fds
 
     def _get_fields_snapshot(self, fields_set=None):
-        new_values = {}
         if fields_set is None:
             fields_set = self._get_editable_fields()
-        for attr, val in self.__dict__.items():
-            if attr in fields_set:
-                new_values[attr] = val
-        return new_values
+        return {attr: val for attr, val in self.__dict__.items() if attr in fields_set}
 
     def _values_have_edits(self, new_values):
         return any(new_values.get(fd_name, None) != self._prior_values_store.get(fd_name, None) for fd_name in new_values.keys())
@@ -305,10 +301,7 @@ class PrimordialModel(HasEditsMixin, CreatedModifiedModel):
 
     def __init__(self, *args, **kwargs):
         r = super(PrimordialModel, self).__init__(*args, **kwargs)
-        if self.pk:
-            self._prior_values_store = self._get_fields_snapshot()
-        else:
-            self._prior_values_store = {}
+        self._prior_values_store = self._get_fields_snapshot() if self.pk else {}
         return r
 
     def save(self, *args, **kwargs):
@@ -340,15 +333,15 @@ class PrimordialModel(HasEditsMixin, CreatedModifiedModel):
             return
         errors = []
         for ut in model.SOFT_UNIQUE_TOGETHER:
-            kwargs = {}
-            for field_name in ut:
-                kwargs[field_name] = getattr(self, field_name, None)
+            kwargs = {field_name: getattr(self, field_name, None) for field_name in ut}
             try:
                 obj = model.objects.get(**kwargs)
             except ObjectDoesNotExist:
                 continue
             if not (self.pk and self.pk == obj.pk):
-                errors.append('%s with this (%s) combination already exists.' % (model.__name__, ', '.join(set(ut) - {'polymorphic_ctype'})))
+                errors.append(
+                    f"{model.__name__} with this ({', '.join(set(ut) - {'polymorphic_ctype'})}) combination already exists."
+                )
         if errors:
             raise ValidationError(errors)
 

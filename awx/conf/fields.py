@@ -197,23 +197,21 @@ class URLField(CharField):
         self.validators.append(URLValidator(**validator_kwargs))
 
     def to_representation(self, value):
-        if value is None:
-            return ''
-        return super(URLField, self).to_representation(value)
+        return '' if value is None else super(URLField, self).to_representation(value)
 
     def run_validators(self, value):
         if self.allow_plain_hostname:
             try:
                 url_parts = urlparse.urlsplit(value)
                 if url_parts.hostname and '.' not in url_parts.hostname:
-                    netloc = '{}.local'.format(url_parts.hostname)
+                    netloc = f'{url_parts.hostname}.local'
                     if url_parts.port:
-                        netloc = '{}:{}'.format(netloc, url_parts.port)
+                        netloc = f'{netloc}:{url_parts.port}'
                     if url_parts.username:
                         if url_parts.password:
-                            netloc = '{}:{}@{}'.format(url_parts.username, url_parts.password, netloc)
+                            netloc = f'{url_parts.username}:{url_parts.password}@{netloc}'
                         else:
-                            netloc = '{}@{}'.format(url_parts.username, netloc)
+                            netloc = f'{url_parts.username}@{netloc}'
                     value = urlparse.urlunsplit([url_parts.scheme, netloc, url_parts.path, url_parts.query, url_parts.fragment])
             except Exception:
                 raise  # If something fails here, just fall through and let the validators check it.

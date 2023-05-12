@@ -51,7 +51,9 @@ class UnifiedJobDeletionMixin(object):
                 return Response({"error": _("Job has not finished processing events.")}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 # if it has been > 1 minute, events are probably lost
-                logger.warning('Allowing deletion of {} through the API without all events ' 'processed.'.format(obj.log_format))
+                logger.warning(
+                    f'Allowing deletion of {obj.log_format} through the API without all events processed.'
+                )
 
         # Manually cascade delete events if unpartitioned job
         if obj.has_unpartitioned_events:
@@ -74,8 +76,7 @@ class InstanceGroupMembershipMixin(object):
         if res:  # handle an error
             return sub_id, res
         sub = get_object_or_400(self.model, pk=sub_id)
-        attach_errors = self.is_valid_relation(parent, sub)
-        if attach_errors:
+        if attach_errors := self.is_valid_relation(parent, sub):
             return sub_id, Response(attach_errors, status=status.HTTP_400_BAD_REQUEST)
         return sub_id, res
 
@@ -106,8 +107,7 @@ class InstanceGroupMembershipMixin(object):
         if res:
             return (sub_id, res)
         sub = get_object_or_400(self.model, pk=sub_id)
-        attach_errors = self.is_valid_relation(parent, sub)
-        if attach_errors:
+        if attach_errors := self.is_valid_relation(parent, sub):
             return (sub_id, Response(attach_errors, status=status.HTTP_400_BAD_REQUEST))
         return (sub_id, res)
 
@@ -156,7 +156,6 @@ class OrganizationCountsMixin(object):
         if self.request is None:
             return full_context
 
-        db_results = {}
         org_qs = self.model.accessible_objects(self.request.user, 'read_role')
         org_id_list = org_qs.values('id')
         if len(org_id_list) == 0:
@@ -168,9 +167,11 @@ class OrganizationCountsMixin(object):
         project_qs = Project.accessible_objects(self.request.user, 'read_role')
         jt_qs = JobTemplate.accessible_objects(self.request.user, 'read_role')
 
-        # Produce counts of Foreign Key relationships
-        db_results['inventories'] = inv_qs.values('organization').annotate(Count('organization')).order_by('organization')
-
+        db_results = {
+            'inventories': inv_qs.values('organization')
+            .annotate(Count('organization'))
+            .order_by('organization')
+        }
         db_results['teams'] = (
             Team.accessible_objects(self.request.user, 'read_role').values('organization').annotate(Count('organization')).order_by('organization')
         )
@@ -190,10 +191,7 @@ class OrganizationCountsMixin(object):
             count_context[org_id] = {'inventories': 0, 'teams': 0, 'users': 0, 'job_templates': 0, 'admins': 0, 'projects': 0}
 
         for res, count_qs in db_results.items():
-            if res == 'users':
-                org_reference = 'id'
-            else:
-                org_reference = 'organization'
+            org_reference = 'id' if res == 'users' else 'organization'
             for entry in count_qs:
                 org_id = entry[org_reference]
                 if org_id in count_context:
@@ -201,7 +199,7 @@ class OrganizationCountsMixin(object):
                         count_context[org_id]['admins'] = entry['admins']
                         count_context[org_id]['users'] = entry['users']
                         continue
-                    count_context[org_id][res] = entry['%s__count' % org_reference]
+                    count_context[org_id][res] = entry[f'{org_reference}__count']
 
         full_context['related_field_counts'] = count_context
 
@@ -217,8 +215,9 @@ class ControlledByScmMixin(object):
     def _reset_inv_src_rev(self, obj):
         if self.request.method in SAFE_METHODS or not obj:
             return
-        project_following_sources = obj.inventory_sources.filter(update_on_project_update=True, source='scm')
-        if project_following_sources:
+        if project_following_sources := obj.inventory_sources.filter(
+            update_on_project_update=True, source='scm'
+        ):
             # Allow inventory changes unrelated to variables
             if self.model == Inventory and (
                 not self.request or not self.request.data or parse_yaml_or_json(self.request.data.get('variables', '')) == parse_yaml_or_json(obj.variables)

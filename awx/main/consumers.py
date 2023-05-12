@@ -34,7 +34,7 @@ class WebsocketSecretAuthHelper:
 
         secret_serialized = hmac.new(force_bytes(settings.BROADCAST_WEBSOCKET_SECRET), msg=force_bytes(payload_serialized), digestmod='sha256').hexdigest()
 
-        return 'HMAC-SHA256 {}:{}'.format(nonce_serialized, secret_serialized)
+        return f'HMAC-SHA256 {nonce_serialized}:{secret_serialized}'
 
     @classmethod
     def verify_secret(cls, s, nonce_tolerance=300):
@@ -72,11 +72,14 @@ class WebsocketSecretAuthHelper:
 
     @classmethod
     def is_authorized(cls, scope):
-        secret = ''
-        for k, v in scope['headers']:
-            if k.decode("utf-8") == 'secret':
-                secret = v.decode("utf-8")
-                break
+        secret = next(
+            (
+                v.decode("utf-8")
+                for k, v in scope['headers']
+                if k.decode("utf-8") == 'secret'
+            ),
+            '',
+        )
         WebsocketSecretAuthHelper.verify_secret(secret)
 
 
@@ -107,10 +110,7 @@ class EventConsumer(AsyncJsonWebsocketConsumer):
         if user and not user.is_anonymous:
             await self.accept()
             await self.send_json({"accept": True, "user": user.id})
-            # store the valid CSRF token from the cookie so we can compare it later
-            # on ws_receive
-            cookie_token = self.scope['cookies'].get('csrftoken')
-            if cookie_token:
+            if cookie_token := self.scope['cookies'].get('csrftoken'):
                 self.scope['session'][XRF_KEY] = cookie_token
         else:
             logger.error("Request user is not authenticated to use websocket.")
@@ -136,8 +136,7 @@ class EventConsumer(AsyncJsonWebsocketConsumer):
         # Therefore, get the "real" User objects from the database before
         # calling the access permission methods
         user_access.user = User.objects.get(id=user_access.user.id)
-        res = user_access.get_queryset().filter(pk=oid).exists()
-        return res
+        return user_access.get_queryset().filter(pk=oid).exists()
 
     async def receive_json(self, data):
         from awx.main.access import consumer_access
@@ -156,7 +155,7 @@ class EventConsumer(AsyncJsonWebsocketConsumer):
             for group_name, v in groups.items():
                 if type(v) is list:
                     for oid in v:
-                        name = '{}-{}'.format(group_name, oid)
+                        name = f'{group_name}-{oid}'
                         access_cls = consumer_access(group_name)
                         if access_cls is not None:
                             user_access = access_cls(user)

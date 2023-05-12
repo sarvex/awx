@@ -21,9 +21,7 @@ def handle_setting_change(key, for_delete=False):
     # When a setting changes or is deleted, remove its value from cache along
     # with any other settings that depend on it.
     setting_keys = [key]
-    for dependent_key in settings_registry.get_dependent_settings(key):
-        # Note: Doesn't handle multiple levels of dependencies!
-        setting_keys.append(dependent_key)
+    setting_keys.extend(iter(settings_registry.get_dependent_settings(key)))
     # NOTE: This block is probably duplicated.
     cache_keys = {Setting.get_cache_key(k) for k in setting_keys}
     cache.delete_many(cache_keys)
@@ -55,8 +53,7 @@ def on_pre_delete_setting(sender, **kwargs):
 @receiver(post_delete, sender=Setting)
 def on_post_delete_setting(sender, **kwargs):
     instance = kwargs['instance']
-    key = getattr(instance, '_saved_key_', None)
-    if key:
+    if key := getattr(instance, '_saved_key_', None):
         handle_setting_change(key, True)
 
 

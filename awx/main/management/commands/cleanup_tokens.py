@@ -22,5 +22,9 @@ class Command(BaseCommand):
         total_accesstokens = OAuth2AccessToken.objects.all().count()
         total_refreshtokens = RefreshToken.objects.all().count()
         management.call_command('cleartokens')
-        self.logger.info("Expired OAuth 2 Access Tokens deleted: {}".format(total_accesstokens - OAuth2AccessToken.objects.all().count()))
-        self.logger.info("Expired OAuth 2 Refresh Tokens deleted: {}".format(total_refreshtokens - RefreshToken.objects.all().count()))
+        self.logger.info(
+            f"Expired OAuth 2 Access Tokens deleted: {total_accesstokens - OAuth2AccessToken.objects.all().count()}"
+        )
+        self.logger.info(
+            f"Expired OAuth 2 Refresh Tokens deleted: {total_refreshtokens - RefreshToken.objects.all().count()}"
+        )

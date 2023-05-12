@@ -29,9 +29,9 @@ class Setting(CreatedModifiedModel):
             # In the rare case the DB value is invalid JSON.
             json_value = u'<Invalid JSON>'
         if self.user:
-            return u'{} ({}) = {}'.format(self.key, self.user, json_value)
+            return f'{self.key} ({self.user}) = {json_value}'
         else:
-            return u'{} = {}'.format(self.key, json_value)
+            return f'{self.key} = {json_value}'
 
     def save(self, *args, **kwargs):
         encrypted = settings_registry.is_setting_encrypted(self.key)
@@ -61,12 +61,12 @@ class Setting(CreatedModifiedModel):
                 self.save(update_fields=['value'])
 
     @classmethod
-    def get_cache_key(self, key):
+    def get_cache_key(cls, key):
         return key
 
     @classmethod
-    def get_cache_id_key(self, key):
-        return '{}_ID'.format(key)
+    def get_cache_id_key(cls, key):
+        return f'{key}_ID'
 
 
 import awx.conf.signals  # noqa

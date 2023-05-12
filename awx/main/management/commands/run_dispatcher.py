@@ -17,7 +17,7 @@ logger = logging.getLogger('awx.main.dispatch')
 
 
 def construct_bcast_queue_name(common_name):
-    return common_name + '_' + settings.CLUSTER_HOST_ID
+    return f'{common_name}_{settings.CLUSTER_HOST_ID}'
 
 
 class Command(BaseCommand):

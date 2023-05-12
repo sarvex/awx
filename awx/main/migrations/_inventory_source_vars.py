@@ -6,7 +6,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.utils.encoding import iri_to_uri
 
 
-FrozenInjectors = dict()
+FrozenInjectors = {}
 logger = logging.getLogger('awx.main.migrations')
 
 
@@ -51,7 +51,11 @@ class azure_rm(PluginFileInjector):
         }
         # by default group by everything
         # always respect user setting, if they gave it
-        group_by = [grouping_name for grouping_name in group_by_hostvar if source_vars.get('group_by_{}'.format(grouping_name), True)]
+        group_by = [
+            grouping_name
+            for grouping_name in group_by_hostvar
+            if source_vars.get(f'group_by_{grouping_name}', True)
+        ]
         ret['keyed_groups'] = [group_by_hostvar[grouping_name] for grouping_name in group_by]
         if 'tag' in group_by:
             # Nasty syntax to reproduce "key_value" group names in addition to "key"
@@ -94,12 +98,12 @@ class azure_rm(PluginFileInjector):
                         kv = kvpair.split(':')
                         # filter out any host that does not have key
                         # in their tags.keys() variable
-                        user_filters.append('"{}" not in tags.keys()'.format(kv[0].strip()))
+                        user_filters.append(f'"{kv[0].strip()}" not in tags.keys()')
                         # if a value is provided, check that the key:value pair matches
                         if len(kv) > 1:
-                            user_filters.append('tags["{}"] != "{}"'.format(kv[0].strip(), kv[1].strip()))
+                            user_filters.append(f'tags["{kv[0].strip()}"] != "{kv[1].strip()}"')
                 else:
-                    user_filters.append('{} not in {}'.format(loc, value.split(',')))
+                    user_filters.append(f"{loc} not in {value.split(',')}")
         if user_filters:
             ret.setdefault('exclude_host_filters', [])
             ret['exclude_host_filters'].extend(user_filters)
@@ -128,7 +132,7 @@ class azure_rm(PluginFileInjector):
             # convert that list in memory to python syntax in a string
             # now put that in jinja2 syntax operating on hostvar key "location"
             # and put that as an entry in the exclusions list
-            ret['exclude_host_filters'].append("location not in {}".format(repr(python_regions)))
+            ret['exclude_host_filters'].append(f"location not in {repr(python_regions)}")
         return ret
 
 
@@ -297,10 +301,8 @@ class ec2(PluginFileInjector):
 
         # Instance ID not part of compat vars, because of settings.EC2_INSTANCE_ID_VAR
         compose_dict = {'ec2_id': 'instance_id'}
-        inst_filters = {}
-
         # Compatibility content
-        compose_dict.update(self._compat_compose_vars())
+        compose_dict |= self._compat_compose_vars()
         # plugin provides "aws_ec2", but not this which the script gave
         ret['groups'] = {'ec2': True}
         if source_vars.get('hostname_variable') is not None:
@@ -316,10 +318,7 @@ class ec2(PluginFileInjector):
         else:
             # public_ip as hostname is non-default plugin behavior, script behavior
             ret['hostnames'] = ['network-interface.addresses.association.public-ip', 'dns-name', 'private-dns-name']
-        # The script returned only running state by default, the plugin does not
-        # https://docs.aws.amazon.com/cli/latest/reference/ec2/describe-instances.html#options
-        # options: pending | running | shutting-down | terminated | stopping | stopped
-        inst_filters['instance-state-name'] = ['running']
+        inst_filters = {'instance-state-name': ['running']}
         # end compatibility content
 
         if source_vars.get('destination_variable') or source_vars.get('vpc_destination_variable'):
@@ -387,23 +386,6 @@ class gce(PluginFileInjector):
         # auth related items
         ret['auth_kind'] = "serviceaccount"
 
-        filters = []
-        # TODO: implement gce group_by options
-        # gce never processed the group_by field, if it had, we would selectively
-        # apply those options here, but it did not, so all groups are added here
-        keyed_groups = [
-            # the jinja2 syntax is duplicated with compose
-            # https://github.com/ansible/ansible/issues/51883
-            {'prefix': 'network', 'key': 'gce_subnetwork'},  # composed var
-            {'prefix': '', 'separator': '', 'key': 'gce_private_ip'},  # composed var
-            {'prefix': '', 'separator': '', 'key': 'gce_public_ip'},  # composed var
-            {'prefix': '', 'separator': '', 'key': 'machineType'},
-            {'prefix': '', 'separator': '', 'key': 'zone'},
-            {'prefix': 'tag', 'key': 'gce_tags'},  # composed var
-            {'prefix': 'status', 'key': 'status | lower'},
-            # NOTE: image hostvar is enabled via retrieve_image_info option
-            {'prefix': '', 'separator': '', 'key': 'image'},
-        ]
         # This will be used as the gce instance_id, must be universal, non-compat
         compose_dict = {'gce_id': 'id'}
 
@@ -414,14 +396,32 @@ class gce(PluginFileInjector):
         # Perform extra API query to get the image hostvar
         ret['retrieve_image_info'] = True
         # Add in old hostvars aliases
-        compose_dict.update(self._compat_compose_vars())
+        compose_dict |= self._compat_compose_vars()
         # Non-default names to match script
         ret['hostnames'] = ['name', 'public_ip', 'private_ip']
-        # end compatibility content
-
-        if keyed_groups:
+        if keyed_groups := [
+            # the jinja2 syntax is duplicated with compose
+            # https://github.com/ansible/ansible/issues/51883
+            {'prefix': 'network', 'key': 'gce_subnetwork'},  # composed var
+            {
+                'prefix': '',
+                'separator': '',
+                'key': 'gce_private_ip',
+            },  # composed var
+            {
+                'prefix': '',
+                'separator': '',
+                'key': 'gce_public_ip',
+            },  # composed var
+            {'prefix': '', 'separator': '', 'key': 'machineType'},
+            {'prefix': '', 'separator': '', 'key': 'zone'},
+            {'prefix': 'tag', 'key': 'gce_tags'},  # composed var
+            {'prefix': 'status', 'key': 'status | lower'},
+            # NOTE: image hostvar is enabled via retrieve_image_info option
+            {'prefix': '', 'separator': '', 'key': 'image'},
+        ]:
             ret['keyed_groups'] = keyed_groups
-        if filters:
+        if filters := []:
             ret['filters'] = filters
         if compose_dict:
             ret['compose'] = compose_dict
@@ -489,29 +489,26 @@ class vmware(PluginFileInjector):
         if inventory_source.group_by:
             vmware_opts.setdefault('groupby_patterns', inventory_source.group_by)
 
-        alias_pattern = vmware_opts.get('alias_pattern')
-        if alias_pattern:
+        if alias_pattern := vmware_opts.get('alias_pattern'):
             ret.setdefault('hostnames', [])
             for alias in alias_pattern.split(','):  # make best effort
-                striped_alias = alias.replace('{', '').replace('}', '').strip()  # make best effort
-                if not striped_alias:
-                    continue
-                ret['hostnames'].append(striped_alias)
+                if (
+                    striped_alias := alias.replace('{', '')
+                    .replace('}', '')
+                    .strip()
+                ):
+                    ret['hostnames'].append(striped_alias)
 
-        host_pattern = vmware_opts.get('host_pattern')  # not working in script
-        if host_pattern:
+        if host_pattern := vmware_opts.get('host_pattern'):
             stripped_hp = host_pattern.replace('{', '').replace('}', '').strip()  # make best effort
             ret['compose']['ansible_host'] = stripped_hp
             ret['compose']['ansible_ssh_host'] = stripped_hp
 
-        host_filters = vmware_opts.get('host_filters')
-        if host_filters:
+        if host_filters := vmware_opts.get('host_filters'):
             ret.setdefault('filters', [])
             for hf in host_filters.split(','):
-                striped_hf = hf.replace('{', '').replace('}', '').strip()  # make best effort
-                if not striped_hf:
-                    continue
-                ret['filters'].append(striped_hf)
+                if striped_hf := hf.replace('{', '').replace('}', '').strip():
+                    ret['filters'].append(striped_hf)
         else:
             # default behavior filters by power state
             ret['filters'] = ['runtime.powerState == "poweredOn"']
@@ -583,9 +580,10 @@ class rhv(PluginFileInjector):
         ret['ovirt_insecure'] = False  # Default changed from script
         # TODO: process strict option upstream
         ret['compose'] = {'ansible_host': '(devices.values() | list)[0][0] if devices else None'}
-        ret['keyed_groups'] = []
-        for key in ('cluster', 'status'):
-            ret['keyed_groups'].append({'prefix': key, 'separator': '_', 'key': key})
+        ret['keyed_groups'] = [
+            {'prefix': key, 'separator': '_', 'key': key}
+            for key in ('cluster', 'status')
+        ]
         ret['keyed_groups'].append({'prefix': 'tag', 'separator': '_', 'key': 'tags'})
         ret['ovirt_hostname_preference'] = ['name', 'fqdn']
         source_vars = inventory_source.source_vars_dict

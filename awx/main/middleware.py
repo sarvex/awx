@@ -145,8 +145,7 @@ class URLModificationMiddleware(MiddlewareMixin):
     def _named_url_to_pk(cls, node, resource, named_url):
         kwargs = {}
         if node.populate_named_url_query_kwargs(kwargs, named_url):
-            match = node.model.objects.filter(**kwargs).first()
-            if match:
+            if match := node.model.objects.filter(**kwargs).first():
                 return str(match.pk)
             else:
                 # if the name does *not* resolve to any actual resource,
@@ -161,10 +160,7 @@ class URLModificationMiddleware(MiddlewareMixin):
                 #
                 return '0'
         if resource == 'job_templates' and '++' not in named_url:
-            # special case for deprecated job template case
-            # will not raise a 404 on its own
-            jt = cls._hijack_for_old_jt_name(node, kwargs, named_url)
-            if jt:
+            if jt := cls._hijack_for_old_jt_name(node, kwargs, named_url):
                 return str(jt.pk)
         return named_url
 

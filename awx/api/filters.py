@@ -36,10 +36,7 @@ class TypeFilterBackend(BaseFilterBackend):
             types = None
             for key, value in request.query_params.items():
                 if key == 'type':
-                    if ',' in value:
-                        types = value.split(',')
-                    else:
-                        types = (value,)
+                    types = value.split(',') if ',' in value else (value, )
             if types:
                 types_map = {}
                 for ct in ContentType.objects.filter(Q(app_label='main') | Q(app_label='auth', model='user')):
@@ -51,7 +48,7 @@ class TypeFilterBackend(BaseFilterBackend):
                 model = queryset.model
                 model_type = get_type_for_model(model)
                 if 'polymorphic_ctype' in get_all_field_names(model):
-                    types_pks = set([v for k, v in types_map.items() if k in types])
+                    types_pks = {v for k, v in types_map.items() if k in types}
                     queryset = queryset.filter(polymorphic_ctype_id__in=types_pks)
                 elif model_type in types:
                     queryset = queryset
@@ -105,9 +102,9 @@ def get_fields_from_path(model, path):
             else:
                 field = model._meta.get_field(name)
             if isinstance(field, ForeignObjectRel) and getattr(field.field, '__prevent_search__', False):
-                raise PermissionDenied(_('Filtering on %s is not allowed.' % name))
+                raise PermissionDenied(_(f'Filtering on {name} is not allowed.'))
             elif getattr(field, '__prevent_search__', False):
-                raise PermissionDenied(_('Filtering on %s is not allowed.' % name))
+                raise PermissionDenied(_(f'Filtering on {name} is not allowed.'))
         if field in field_list:
             # Field traversed twice, could create infinite JOINs, DoSing Tower
             raise ParseError(_('Loops not allowed in filters, detected on field {}.').format(field.name))
@@ -176,8 +173,7 @@ class FieldLookupBackend(BaseFilterBackend):
         field_list, new_path = get_fields_from_path(model, path)
 
         new_lookup = new_path
-        new_lookup = '__'.join([new_path, suffix])
-        return field_list, new_lookup
+        return field_list, '__'.join([new_lookup, suffix])
 
     def get_field_from_lookup(self, model, lookup):
         '''Method to match return type of single field, if needed.'''
@@ -186,10 +182,7 @@ class FieldLookupBackend(BaseFilterBackend):
 
     def to_python_related(self, value):
         value = force_text(value)
-        if value.lower() in ('none', 'null'):
-            return None
-        else:
-            return int(value)
+        return None if value.lower() in ('none', 'null') else int(value)
 
     def value_to_python_for_field(self, field, value):
         if isinstance(field, models.NullBooleanField):
@@ -223,11 +216,12 @@ class FieldLookupBackend(BaseFilterBackend):
         elif new_lookup.endswith('__isnull'):
             value = to_python_boolean(value)
         elif new_lookup.endswith('__in'):
-            items = []
             if not value:
                 raise ValueError('cannot provide empty value for __in')
-            for item in value.split(','):
-                items.append(self.value_to_python_for_field(field, item))
+            items = [
+                self.value_to_python_for_field(field, item)
+                for item in value.split(',')
+            ]
             value = items
         elif new_lookup.endswith('__regex') or new_lookup.endswith('__iregex'):
             try:
@@ -237,11 +231,21 @@ class FieldLookupBackend(BaseFilterBackend):
         elif new_lookup.endswith('__search'):
             related_model = getattr(field, 'related_model', None)
             if not related_model:
-                raise ValueError('%s is not searchable' % new_lookup[:-8])
-            new_lookups = []
-            for rm_field in related_model._meta.fields:
-                if rm_field.name in ('username', 'first_name', 'last_name', 'email', 'name', 'description', 'playbook'):
-                    new_lookups.append('{}__{}__icontains'.format(new_lookup[:-8], rm_field.name))
+                raise ValueError(f'{new_lookup[:-8]} is not searchable')
+            new_lookups = [
+                f'{new_lookup[:-8]}__{rm_field.name}__icontains'
+                for rm_field in related_model._meta.fields
+                if rm_field.name
+                in (
+                    'username',
+                    'first_name',
+                    'last_name',
+                    'email',
+                    'name',
+                    'description',
+                    'playbook',
+                )
+            ]
             return value, new_lookups, needs_distinct
         else:
             value = self.value_to_python_for_field(field, value)
@@ -365,10 +369,7 @@ class FieldLookupBackend(BaseFilterBackend):
                             q_chain |= Q(**{constrain: term})
                         queryset = queryset.filter(q_chain)
                 for n, k, v in chain_filters:
-                    if n:
-                        q = ~Q(**{k: v})
-                    else:
-                        q = Q(**{k: v})
+                    q = ~Q(**{k: v}) if n else Q(**{k: v})
                     queryset = queryset.filter(q)
                 queryset = queryset.filter(*args)
                 if needs_distinct:
@@ -391,10 +392,7 @@ class OrderByBackend(BaseFilterBackend):
             for key, value in request.query_params.items():
                 if key in ('order', 'order_by'):
                     order_by = value
-                    if ',' in value:
-                        order_by = value.split(',')
-                    else:
-                        order_by = (value,)
+                    order_by = value.split(',') if ',' in value else (value, )
             if order_by is None:
                 order_by = self.get_default_ordering(view)
             if order_by:
@@ -407,16 +405,18 @@ class OrderByBackend(BaseFilterBackend):
                 new_order_by = []
                 if 'polymorphic_ctype' in get_all_field_names(queryset.model):
                     for field in order_by:
-                        if field == 'type':
-                            new_order_by.append('polymorphic_ctype__model')
-                        elif field == '-type':
+                        if field == '-type':
                             new_order_by.append('-polymorphic_ctype__model')
+                        elif field == 'type':
+                            new_order_by.append('polymorphic_ctype__model')
                         else:
                             new_order_by.append(field)
                 else:
-                    for field in order_by:
-                        if field not in ('type', '-type'):
-                            new_order_by.append(field)
+                    new_order_by.extend(
+                        field
+                        for field in order_by
+                        if field not in ('type', '-type')
+                    )
                 queryset = queryset.order_by(*new_order_by)
             return queryset
         except FieldError as e:
@@ -425,9 +425,7 @@ class OrderByBackend(BaseFilterBackend):
 
     def get_default_ordering(self, view):
         ordering = getattr(view, 'ordering', None)
-        if isinstance(ordering, str):
-            return (ordering,)
-        return ordering
+        return (ordering, ) if isinstance(ordering, str) else ordering
 
     def _validate_ordering_fields(self, model, order_by):
         for field_name in order_by:
@@ -439,7 +437,7 @@ class OrderByBackend(BaseFilterBackend):
                 path = field_name[1:]
             try:
                 field, new_path = get_field_from_path(model, path)
-                new_path = '{}{}'.format(prefix, new_path)
+                new_path = f'{prefix}{new_path}'
             except (FieldError, FieldDoesNotExist) as e:
                 raise ParseError(e.args[0])
             yield new_path

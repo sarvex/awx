@@ -24,8 +24,9 @@ def forwards(apps, schema_editor):
 
     tower_type = CredentialType.objects.filter(managed_by_tower=True, namespace='tower').first()
     if tower_type is not None:
-        controller_type = CredentialType.objects.filter(managed_by_tower=True, namespace='controller', kind='cloud').first()
-        if controller_type:
+        if controller_type := CredentialType.objects.filter(
+            managed_by_tower=True, namespace='controller', kind='cloud'
+        ).first():
             # this gets created by prior migrations in upgrade scenarios
             controller_type.delete()
 
@@ -44,11 +45,13 @@ def backwards(apps, schema_editor):
     InventoryUpdate = apps.get_model('main', 'InventoryUpdate')
     InventorySource = apps.get_model('main', 'InventorySource')
 
-    r = InventoryUpdate.objects.filter(source='controller').update(source='tower')
-    if r:
+    if r := InventoryUpdate.objects.filter(source='controller').update(
+        source='tower'
+    ):
         logger.warn(f'Renamed {r} controller inventory updates to tower')
-    r = InventorySource.objects.filter(source='controller').update(source='tower')
-    if r:
+    if r := InventorySource.objects.filter(source='controller').update(
+        source='tower'
+    ):
         logger.warn(f'Renamed {r} controller inventory sources to tower')
 
     CredentialType = apps.get_model('main', 'CredentialType')

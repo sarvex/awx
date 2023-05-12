@@ -23,8 +23,7 @@ class JobStatusLifeCycle:
             return job_event_count - 1
 
         random.seed(random_seed)
-        job_event_index = random.randint(0, job_event_count - 1)
-        return job_event_index
+        return random.randint(0, job_event_count - 1)
 
 
 class ReplayJobEvents(JobStatusLifeCycle):
@@ -49,7 +48,7 @@ class ReplayJobEvents(JobStatusLifeCycle):
         try:
             unified_job = UnifiedJob.objects.get(id=job_id)
         except UnifiedJob.DoesNotExist:
-            print("UnifiedJob {} not found.".format(job_id))
+            print(f"UnifiedJob {job_id} not found.")
             sys.exit(1)
 
         return unified_job.get_real_instance()
@@ -79,7 +78,7 @@ class ReplayJobEvents(JobStatusLifeCycle):
             job_events = job.system_job_events.order_by('created')
         count = job_events.count()
         if count == 0:
-            raise RuntimeError("No events for job id {}".format(job.id))
+            raise RuntimeError(f"No events for job id {job.id}")
         return job_events, count
 
     def run(self, job_id, speed=1.0, verbosity=0, skip_range=[], random_seed=0, final_status_delay=0, debug=False):
@@ -108,7 +107,7 @@ class ReplayJobEvents(JobStatusLifeCycle):
             job = self.get_job(job_id)
             job_events, job_event_count = self.get_job_events(job)
         except RuntimeError as e:
-            print("{}".format(e.message))
+            print(f"{e.message}")
             sys.exit(1)
 
         je_previous = None
@@ -124,7 +123,7 @@ class ReplayJobEvents(JobStatusLifeCycle):
                 continue
 
             if debug:
-                input("{} of {}:".format(n, job_event_count))
+                input(f"{n} of {job_event_count}:")
 
             if not je_previous:
                 stats['recording_start'] = je_current.created
@@ -138,26 +137,26 @@ class ReplayJobEvents(JobStatusLifeCycle):
             recording_diff = (je_current.created - je_previous.created).total_seconds() * (1.0 / speed)
             stats['events_distance_total'] += recording_diff
             if verbosity >= 3:
-                print("recording: next job in {} seconds".format(recording_diff))
+                print(f"recording: next job in {recording_diff} seconds")
             if replay_offset >= 0:
                 replay_diff = recording_diff - replay_offset
 
                 if replay_diff > 0:
                     stats['events_ontime']['total'] += 1
                     if verbosity >= 3:
-                        print("\treplay: sleep for {} seconds".format(replay_diff))
+                        print(f"\treplay: sleep for {replay_diff} seconds")
                     self.sleep(replay_diff)
                 else:
                     stats['events_late']['total'] += 1
                     stats['events_late']['lateness_total'] += replay_diff * -1
                     if verbosity >= 3:
-                        print("\treplay: too far behind to sleep {} seconds".format(replay_diff))
+                        print(f"\treplay: too far behind to sleep {replay_diff} seconds")
             else:
                 replay_offset = self.replay_offset(je_current.created, speed)
                 stats['events_late']['lateness_total'] += replay_offset * -1
                 stats['events_late']['total'] += 1
                 if verbosity >= 3:
-                    print("\treplay: behind by {} seconds".format(replay_offset))
+                    print(f"\treplay: behind by {replay_offset} seconds")
 
             stats['events_total'] += 1
             je_previous = je_current
@@ -194,7 +193,7 @@ class Command(BaseCommand):
     help = 'Replay job events over websockets ordered by created on date.'
 
     def _parse_slice_range(self, slice_arg):
-        slice_arg = tuple([int(n) for n in slice_arg.split(':')])
+        slice_arg = tuple(int(n) for n in slice_arg.split(':'))
         slice_obj = slice(*slice_arg)
 
         start = slice_obj.start or 0

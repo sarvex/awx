@@ -4,6 +4,8 @@ from __future__ import unicode_literals
 from django.db import migrations
 
 
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -11,7 +13,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunSQL([("DROP TABLE IF EXISTS {} CASCADE;".format(table))])
+        migrations.RunSQL([f"DROP TABLE IF EXISTS {table} CASCADE;"])
         for table in (
             'celery_taskmeta',
             'celery_tasksetmeta',

@@ -229,8 +229,8 @@ class Inventory(CommonModelNameNotUnique, ResourceMixin, RelatedJobsMixin):
         m = re.match(r"slice(?P<number>\d+)of(?P<step>\d+)", slice_str)
         if not m:
             raise ParseError(_('Could not parse subset as slice specification.'))
-        number = int(m.group('number'))
-        step = int(m.group('step'))
+        number = int(m['number'])
+        step = int(m['step'])
         if number > step:
             raise ParseError(_('Slice number must be less than total number of slices.'))
         elif number < 1:
@@ -238,7 +238,7 @@ class Inventory(CommonModelNameNotUnique, ResourceMixin, RelatedJobsMixin):
         return (number, step)
 
     def get_script_data(self, hostvars=False, towervars=False, show_all=False, slice_number=1, slice_count=1):
-        hosts_kw = dict()
+        hosts_kw = {}
         if not show_all:
             hosts_kw['enabled'] = True
         fetch_fields = ['name', 'id', 'variables', 'inventory_id']
@@ -249,9 +249,9 @@ class Inventory(CommonModelNameNotUnique, ResourceMixin, RelatedJobsMixin):
             offset = slice_number - 1
             hosts = hosts[offset::slice_count]
 
-        data = dict()
-        all_group = data.setdefault('all', dict())
-        all_hostnames = set(host.name for host in hosts)
+        data = {}
+        all_group = data.setdefault('all', {})
+        all_hostnames = {host.name for host in hosts}
 
         if self.variables_dict:
             all_group['vars'] = self.variables_dict
@@ -290,13 +290,12 @@ class Inventory(CommonModelNameNotUnique, ResourceMixin, RelatedJobsMixin):
             # Now use in-memory maps to build up group info.
             all_group_names = []
             for group in self.groups.only('name', 'id', 'variables', 'inventory_id'):
-                group_info = dict()
+                group_info = {}
                 if group.id in group_hosts_map:
                     group_info['hosts'] = group_hosts_map[group.id]
                 if group.id in group_children_map:
                     group_info['children'] = group_children_map[group.id]
-                group_vars = group.variables_dict
-                if group_vars:
+                if group_vars := group.variables_dict:
                     group_info['vars'] = group_vars
                 if group_info:
                     data[group.name] = group_info
@@ -307,8 +306,8 @@ class Inventory(CommonModelNameNotUnique, ResourceMixin, RelatedJobsMixin):
                 all_group['children'] = all_group_names
 
         if hostvars:
-            data.setdefault('_meta', dict())
-            data['_meta'].setdefault('hostvars', dict())
+            data.setdefault('_meta', {})
+            data['_meta'].setdefault('hostvars', {})
             for host in hosts:
                 data['_meta']['hostvars'][host.name] = host.variables_dict
                 if towervars:
@@ -567,7 +566,7 @@ class Host(CommonModelNameNotUnique, RelatedJobsMixin):
         try:
             sanitize_jinja(self.name)
         except ValueError as e:
-            raise ValidationError(str(e) + ": {}".format(self.name))
+            raise ValidationError(f"{str(e)}: {self.name}")
         return self.name
 
     def save(self, *args, **kwargs):
@@ -706,7 +705,7 @@ class Group(CommonModelNameNotUnique, RelatedJobsMixin):
         be excluded unless there is a cycle leading back to it.
         """
         group_parents_map = self.inventory.get_group_parents_map()
-        child_pks_to_check = set([self.pk])
+        child_pks_to_check = {self.pk}
         child_pks_checked = set()
         parent_pks = set()
         while child_pks_to_check:
@@ -728,7 +727,7 @@ class Group(CommonModelNameNotUnique, RelatedJobsMixin):
         be excluded unless there is a cycle leading back to it.
         """
         group_children_map = self.inventory.get_group_children_map()
-        parent_pks_to_check = set([self.pk])
+        parent_pks_to_check = {self.pk}
         parent_pks_checked = set()
         child_pks = set()
         while parent_pks_to_check:
@@ -750,7 +749,7 @@ class Group(CommonModelNameNotUnique, RelatedJobsMixin):
         """
         group_children_map = self.inventory.get_group_children_map()
         group_hosts_map = self.inventory.get_group_hosts_map()
-        parent_pks_to_check = set([self.pk])
+        parent_pks_to_check = {self.pk}
         parent_pks_checked = set()
         host_pks = set()
         while parent_pks_to_check:
@@ -931,11 +930,9 @@ class InventorySourceOptions(BaseModel):
                 if cred.kind == self.source.replace('ec2', 'aws'):
                     credential = cred
                     break
-            else:
-                # these need to be returned in the API credential field
-                if cred.credential_type.kind != 'vault':
-                    credential = cred
-                    break
+            elif cred.credential_type.kind != 'vault':
+                credential = cred
+                break
         return credential
 
     def get_extra_credentials(self):
@@ -946,11 +943,11 @@ class InventorySourceOptions(BaseModel):
         if self.source in CLOUD_PROVIDERS:
             # these have special injection logic associated with them
             special_cred = self.get_cloud_credential()
-        extra_creds = []
-        for cred in self.credentials.all():
-            if special_cred is None or cred.pk != special_cred.pk:
-                extra_creds.append(cred)
-        return extra_creds
+        return [
+            cred
+            for cred in self.credentials.all()
+            if special_cred is None or cred.pk != special_cred.pk
+        ]
 
     @property
     def credential(self):
@@ -1008,7 +1005,13 @@ class InventorySource(UnifiedJobTemplate, InventorySourceOptions, CustomVirtualE
 
     @classmethod
     def _get_unified_job_field_names(cls):
-        return set(f.name for f in InventorySourceOptions._meta.fields) | set(['name', 'description', 'organization', 'credentials', 'inventory'])
+        return {f.name for f in InventorySourceOptions._meta.fields} | {
+            'name',
+            'description',
+            'organization',
+            'credentials',
+            'inventory',
+        }
 
     def save(self, *args, **kwargs):
         # if this is a new object, inherit organization from its inventory
@@ -1021,18 +1024,18 @@ class InventorySource(UnifiedJobTemplate, InventorySourceOptions, CustomVirtualE
         is_new_instance = not bool(self.pk)
 
         # Set name automatically. Include PK (or placeholder) to make sure the names are always unique.
-        replace_text = '__replace_%s__' % now()
+        replace_text = f'__replace_{now()}__'
         old_name_re = re.compile(r'^inventory_source \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.*?$')
         if not self.name or old_name_re.match(self.name) or '__replace_' in self.name:
             group_name = getattr(self, 'v1_group_name', '')
             if self.inventory and self.pk:
-                self.name = '%s (%s - %s)' % (group_name, self.inventory.name, self.pk)
+                self.name = f'{group_name} ({self.inventory.name} - {self.pk})'
             elif self.inventory:
-                self.name = '%s (%s - %s)' % (group_name, self.inventory.name, replace_text)
+                self.name = f'{group_name} ({self.inventory.name} - {replace_text})'
             elif not is_new_instance:
-                self.name = 'inventory source (%s)' % self.pk
+                self.name = f'inventory source ({self.pk})'
             else:
-                self.name = 'inventory source (%s)' % replace_text
+                self.name = f'inventory source ({replace_text})'
             if 'name' not in update_fields:
                 update_fields.append('name')
         # Reset revision if SCM source has changed parameters
@@ -1051,25 +1054,32 @@ class InventorySource(UnifiedJobTemplate, InventorySourceOptions, CustomVirtualE
         if replace_text in self.name:
             self.name = self.name.replace(replace_text, str(self.pk))
             super(InventorySource, self).save(update_fields=['name'])
-        if self.source == 'scm' and is_new_instance and self.update_on_project_update:
-            # Schedule a new Project update if one is not already queued
-            if self.source_project and not self.source_project.project_updates.filter(status__in=['new', 'pending', 'waiting']).exists():
-                self.update()
-        if not getattr(_inventory_updates, 'is_updating', False):
-            if self.inventory is not None:
-                self.inventory.update_computed_fields()
+        if (
+            self.source == 'scm'
+            and is_new_instance
+            and self.update_on_project_update
+            and self.source_project
+            and not self.source_project.project_updates.filter(
+                status__in=['new', 'pending', 'waiting']
+            ).exists()
+        ):
+            self.update()
+        if (
+            not getattr(_inventory_updates, 'is_updating', False)
+            and self.inventory is not None
+        ):
+            self.inventory.update_computed_fields()
 
     def _get_current_status(self):
-        if self.source:
-            if self.current_job and self.current_job.status:
-                return self.current_job.status
-            elif not self.last_job:
-                return 'never updated'
-            # inherit the child job status
-            else:
-                return self.last_job.status
-        else:
+        if not self.source:
             return 'none'
+        if self.current_job and self.current_job.status:
+            return self.current_job.status
+        elif not self.last_job:
+            return 'never updated'
+        # inherit the child job status
+        else:
+            return self.last_job.status
 
     def get_absolute_url(self, request=None):
         return reverse('api:inventory_source_detail', kwargs={'pk': self.pk}, request=request)
@@ -1099,7 +1109,7 @@ class InventorySource(UnifiedJobTemplate, InventorySourceOptions, CustomVirtualE
             if '_eager_fields' not in kwargs:
                 kwargs['_eager_fields'] = {}
             if 'name' not in kwargs['_eager_fields']:
-                name = '{} - {}'.format(self.inventory.name, self.name)
+                name = f'{self.inventory.name} - {self.name}'
                 name_field = self._meta.get_field('name')
                 if len(name) > name_field.max_length:
                     name = name[: name_field.max_length]
@@ -1110,9 +1120,11 @@ class InventorySource(UnifiedJobTemplate, InventorySourceOptions, CustomVirtualE
     def cache_timeout_blocked(self):
         if not self.last_job_run:
             return False
-        if (self.last_job_run + datetime.timedelta(seconds=self.update_cache_timeout)) > now():
-            return True
-        return False
+        return (
+            self.last_job_run
+            + datetime.timedelta(seconds=self.update_cache_timeout)
+            > now()
+        )
 
     @property
     def needs_update_on_launch(self):
@@ -1245,7 +1257,7 @@ class InventoryUpdate(UnifiedJob, InventorySourceOptions, JobNotificationMixin, 
         return reverse('api:inventory_update_detail', kwargs={'pk': self.pk}, request=request)
 
     def get_ui_url(self):
-        return urljoin(settings.TOWER_URL_BASE, "/#/jobs/inventory/{}".format(self.pk))
+        return urljoin(settings.TOWER_URL_BASE, f"/#/jobs/inventory/{self.pk}")
 
     def get_actual_source_path(self):
         '''Alias to source_path that combines with project path for for SCM file based sources'''
@@ -1286,23 +1298,22 @@ class InventoryUpdate(UnifiedJob, InventorySourceOptions, JobNotificationMixin, 
     @property
     def preferred_instance_groups(self):
         if self.inventory_source.inventory is not None and self.inventory_source.inventory.organization is not None:
-            organization_groups = [x for x in self.inventory_source.inventory.organization.instance_groups.all()]
+            organization_groups = list(
+                self.inventory_source.inventory.organization.instance_groups.all()
+            )
         else:
             organization_groups = []
         if self.inventory_source.inventory is not None:
-            inventory_groups = [x for x in self.inventory_source.inventory.instance_groups.all()]
+            inventory_groups = list(self.inventory_source.inventory.instance_groups.all())
         else:
             inventory_groups = []
         selected_groups = inventory_groups + organization_groups
-        if not selected_groups:
-            return self.global_instance_groups
-        return selected_groups
+        return self.global_instance_groups if not selected_groups else selected_groups
 
     def cancel(self, job_explanation=None, is_chain=False):
         res = super(InventoryUpdate, self).cancel(job_explanation=job_explanation, is_chain=is_chain)
-        if res:
-            if self.launch_type != 'scm' and self.source_project_update:
-                self.source_project_update.cancel(job_explanation=job_explanation)
+        if res and self.launch_type != 'scm' and self.source_project_update:
+            self.source_project_update.cancel(job_explanation=job_explanation)
         return res
 
 
@@ -1399,8 +1410,9 @@ class PluginFileInjector(object):
         return injected_env
 
     def get_plugin_env(self, inventory_update, private_data_dir, private_data_files):
-        env = self._get_shared_env(inventory_update, private_data_dir, private_data_files)
-        return env
+        return self._get_shared_env(
+            inventory_update, private_data_dir, private_data_files
+        )
 
     def build_private_data(self, inventory_update, private_data_dir):
         return self.build_plugin_private_data(inventory_update, private_data_dir)

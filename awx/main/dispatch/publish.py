@@ -57,6 +57,8 @@ class task:
     def __call__(self, fn=None):
         queue = self.queue
 
+
+
         class PublisherMixin(object):
 
             queue = None
@@ -76,8 +78,7 @@ class task:
                     logger.error(msg)
                     raise ValueError(msg)
                 obj = {'uuid': task_id, 'args': args, 'kwargs': kwargs, 'task': cls.name}
-                guid = GuidMiddleware.get_guid()
-                if guid:
+                if guid := GuidMiddleware.get_guid():
                     obj['guid'] = guid
                 obj.update(**kw)
                 if callable(queue):
@@ -86,6 +87,7 @@ class task:
                     with pg_bus_conn() as conn:
                         conn.notify(queue, json.dumps(obj))
                 return (obj, queue)
+
 
         # If the object we're wrapping *is* a class (e.g., RunJob), return
         # a *new* class that inherits from the wrapped class *and* BaseTask
@@ -96,7 +98,7 @@ class task:
         ns = {'name': serialize_task(fn), 'queue': queue}
         if inspect.isclass(fn):
             bases = list(fn.__bases__)
-            ns.update(fn.__dict__)
+            ns |= fn.__dict__
         cls = type(fn.__name__, tuple(bases + [PublisherMixin]), ns)
         if inspect.isclass(fn):
             return cls

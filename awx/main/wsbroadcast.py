@@ -143,7 +143,7 @@ class BroadcastWebsocketTask(WebsocketTask):
                 except json.JSONDecodeError:
                     logmsg = "Failed to decode broadcast message"
                     if logger.isEnabledFor(logging.DEBUG):
-                        logmsg = "{} {}".format(logmsg, payload)
+                        logmsg = f"{logmsg} {payload}"
                     logger.warn(logmsg)
                     continue
                 (group, message) = unwrap_broadcast_msg(payload)
@@ -163,7 +163,7 @@ class BroadcastWebsocketManager(object):
             'hostname3': BroadcastWebsocketTask(),
         }
         '''
-        self.broadcast_tasks = dict()
+        self.broadcast_tasks = {}
         self.local_hostname = get_local_host()
         self.stats_mgr = BroadcastWebsocketStatsManager(self.event_loop, self.local_hostname)
 

@@ -96,9 +96,7 @@ class JSONBField(upstream_JSONBField):
     def from_db_value(self, value, expression, connection):
         # Work around a bug in django-jsonfield
         # https://bitbucket.org/schinckel/django-jsonfield/issues/57/cannot-use-in-the-same-project-as-djangos
-        if isinstance(value, str):
-            return json.loads(value)
-        return value
+        return json.loads(value) if isinstance(value, str) else value
 
 
 # Based on AutoOneToOneField from django-annoying:
@@ -139,15 +137,15 @@ def resolve_role_field(obj, field):
     if len(field_components) == 1:
         # use extremely generous duck typing to accomidate all possible forms
         # of the model that may be used during various migrations
-        if obj._meta.model_name != 'role' or obj._meta.app_label != 'main':
-            raise Exception(smart_text('{} refers to a {}, not a Role'.format(field, type(obj))))
-        ret.append(obj.id)
-    else:
-        if type(obj) is ManyToManyDescriptor:
-            for o in obj.all():
-                ret += resolve_role_field(o, field_components[1])
+        if obj._meta.model_name == 'role' and obj._meta.app_label == 'main':
+            ret.append(obj.id)
         else:
-            ret += resolve_role_field(obj, field_components[1])
+            raise Exception(smart_text(f'{field} refers to a {type(obj)}, not a Role'))
+    elif type(obj) is ManyToManyDescriptor:
+        for o in obj.all():
+            ret += resolve_role_field(o, field_components[1])
+    else:
+        ret += resolve_role_field(obj, field_components[1])
 
     return ret
 
@@ -161,7 +159,11 @@ def is_implicit_parent(parent_role, child_role):
     if child_role.content_object is None:
         # The only singleton implicit parent is the system admin being
         # a parent of the system auditor role
-        return bool(child_role.singleton_name == ROLE_SINGLETON_SYSTEM_AUDITOR and parent_role.singleton_name == ROLE_SINGLETON_SYSTEM_ADMINISTRATOR)
+        return (
+            child_role.singleton_name == ROLE_SINGLETON_SYSTEM_AUDITOR
+            and parent_role.singleton_name
+            == ROLE_SINGLETON_SYSTEM_ADMINISTRATOR
+        )
     # Get the list of implicit parents that were defined at the class level.
     implicit_parents = getattr(child_role.content_object.__class__, child_role.role_field).field.parent_role
     if type(implicit_parents) != list:
@@ -196,16 +198,13 @@ def update_role_parentage_for_instance(instance):
         cur_role = getattr(instance, implicit_role_field.name)
         original_parents = set(json.loads(cur_role.implicit_parents))
         new_parents = implicit_role_field._resolve_parent_roles(instance)
-        removals = original_parents - new_parents
-        if removals:
+        if removals := original_parents - new_parents:
             cur_role.parents.remove(*list(removals))
             parents_removed.add(cur_role.pk)
-        additions = new_parents - original_parents
-        if additions:
+        if additions := new_parents - original_parents:
             cur_role.parents.add(*list(additions))
             parents_added.add(cur_role.pk)
-        new_parents_list = list(new_parents)
-        new_parents_list.sort()
+        new_parents_list = sorted(new_parents)
         new_parents_json = json.dumps(new_parents_list)
         if cur_role.implicit_parents != new_parents_json:
             cur_role.implicit_parents = new_parents_json
@@ -269,40 +268,45 @@ class ImplicitRoleField(models.ForeignKey):
             # consistency is assured by unit test awx.main.tests.functional
             field = getattr(cls, field_name, None)
 
-            if field and type(field) is ReverseManyToOneDescriptor or type(field) is ManyToManyDescriptor:
+            if (
+                field
+                and type(field) is ReverseManyToOneDescriptor
+                or type(field) is ManyToManyDescriptor
+            ):
 
                 if '.' in field_attr:
                     raise Exception('Referencing deep roles through ManyToMany fields is unsupported.')
 
-                if type(field) is ReverseManyToOneDescriptor:
-                    sender = field.through
-                else:
-                    sender = field.related.through
-
+                sender = (
+                    field.through
+                    if type(field) is ReverseManyToOneDescriptor
+                    else field.related.through
+                )
                 reverse = type(field) is ManyToManyDescriptor
                 m2m_changed.connect(self.m2m_update(field_attr, reverse), sender, weak=False)
 
     def m2m_update(self, field_attr, _reverse):
         def _m2m_update(instance, action, model, pk_set, reverse, **kwargs):
-            if action == 'post_add' or action == 'pre_remove':
-                if _reverse:
-                    reverse = not reverse
+            if action not in ['post_add', 'pre_remove']:
+                return
+            if _reverse:
+                reverse = not reverse
 
-                if reverse:
-                    for pk in pk_set:
-                        obj = model.objects.get(pk=pk)
-                        if action == 'post_add':
-                            getattr(instance, field_attr).children.add(getattr(obj, self.name))
-                        if action == 'pre_remove':
-                            getattr(instance, field_attr).children.remove(getattr(obj, self.name))
+            if reverse:
+                for pk in pk_set:
+                    obj = model.objects.get(pk=pk)
+                    if action == 'post_add':
+                        getattr(instance, field_attr).children.add(getattr(obj, self.name))
+                    if action == 'pre_remove':
+                        getattr(instance, field_attr).children.remove(getattr(obj, self.name))
 
-                else:
-                    for pk in pk_set:
-                        obj = model.objects.get(pk=pk)
-                        if action == 'post_add':
-                            getattr(instance, self.name).parents.add(getattr(obj, field_attr))
-                        if action == 'pre_remove':
-                            getattr(instance, self.name).parents.remove(getattr(obj, field_attr))
+            else:
+                for pk in pk_set:
+                    obj = model.objects.get(pk=pk)
+                    if action == 'post_add':
+                        getattr(instance, self.name).parents.add(getattr(obj, field_attr))
+                    if action == 'pre_remove':
+                        getattr(instance, self.name).parents.remove(getattr(obj, field_attr))
 
         return _m2m_update
 
@@ -322,7 +326,7 @@ class ImplicitRoleField(models.ForeignKey):
                 if cur_role is None:
                     missing_roles.append(Role_(role_field=implicit_role_field.name, content_type_id=ct_id, object_id=latest_instance.id))
 
-            if len(missing_roles) > 0:
+            if missing_roles:
                 Role_.objects.bulk_create(missing_roles)
                 updates = {}
                 role_ids = []
@@ -361,12 +365,18 @@ class ImplicitRoleField(models.ForeignKey):
         return parent_roles
 
     def _post_delete(self, instance, *args, **kwargs):
-        role_ids = []
-        for implicit_role_field in getattr(instance.__class__, '__implicit_role_fields'):
-            role_ids.append(getattr(instance, implicit_role_field.name + '_id'))
-
+        role_ids = [
+            getattr(instance, f'{implicit_role_field.name}_id')
+            for implicit_role_field in getattr(
+                instance.__class__, '__implicit_role_fields'
+            )
+        ]
         Role_ = utils.get_current_apps().get_model('main', 'Role')
-        child_ids = [x for x in Role_.parents.through.objects.filter(to_role_id__in=role_ids).distinct().values_list('from_role_id', flat=True)]
+        child_ids = list(
+            Role_.parents.through.objects.filter(to_role_id__in=role_ids)
+            .distinct()
+            .values_list('from_role_id', flat=True)
+        )
         Role_.objects.filter(id__in=role_ids).delete()
         Role.rebuild_role_ancestor_list([], child_ids)
 
@@ -470,7 +480,7 @@ def format_url(value):
     if parsed.scheme == '':
         raise jsonschema.exceptions.FormatError('Invalid URL: Missing url scheme (http, https, etc.)')
     if parsed.netloc == '':
-        raise jsonschema.exceptions.FormatError('Invalid URL: {}'.format(value))
+        raise jsonschema.exceptions.FormatError(f'Invalid URL: {value}')
     return True
 
 
@@ -609,20 +619,14 @@ class CredentialInputField(JSONSchemaField):
             if error.validator == 'pattern' and 'error' in error.schema:
                 error.message = error.schema['error'].format(instance=error.instance)
             if error.validator == 'dependencies':
-                # replace the default error messaging w/ a better i18n string
-                # I wish there was a better way to determine the parameters of
-                # this validation failure, but the exception jsonschema raises
-                # doesn't include them as attributes (just a hard-coded error
-                # string)
-                match = re.search(
+                if match := re.search(
                     # 'foo' is a dependency of 'bar'
                     r"'"  # apostrophe
                     r"([^']+)"  # one or more non-apostrophes (first group)
                     r"'[\w ]+'"  # one or more words/spaces
                     r"([^']+)",  # second group
                     error.message,
-                )
-                if match:
+                ):
                     label, extraneous = match.groups()
                     if error.schema['properties'].get(label):
                         label = error.schema['properties'][label]['label']
@@ -732,7 +736,7 @@ class CredentialTypeInputField(JSONSchemaField):
 
             if id_ in ids:
                 raise django_exceptions.ValidationError(
-                    _('field IDs must be unique (%s)' % id_),
+                    _(f'field IDs must be unique ({id_})'),
                     code='invalid',
                     params={'value': value},
                 )
@@ -842,7 +846,7 @@ class CredentialTypeInjectorField(JSONSchemaField):
         # In addition to basic schema validation, search the injector fields
         # for template variables and make sure they match the fields defined in
         # the inputs
-        valid_namespace = dict((field, 'EXAMPLE') for field in model_instance.defined_fields)
+        valid_namespace = {field: 'EXAMPLE' for field in model_instance.defined_fields}
 
         class ExplodingNamespace:
             def __str__(self):
@@ -949,9 +953,17 @@ class OrderedManyToManyDescriptor(ManyToManyDescriptor):
         model = self.rel.related_model if self.reverse else self.rel.model
 
         def add_custom_queryset_to_many_related_manager(many_related_manage_cls):
+
+
+
             class OrderedManyRelatedManager(many_related_manage_cls):
                 def get_queryset(self):
-                    return super(OrderedManyRelatedManager, self).get_queryset().order_by('%s__position' % self.through._meta.model_name)
+                    return (
+                        super(OrderedManyRelatedManager, self)
+                        .get_queryset()
+                        .order_by(f'{self.through._meta.model_name}__position')
+                    )
+
 
             return OrderedManyRelatedManager
 

@@ -115,7 +115,11 @@ class CallbackBrokerWorker(BaseWorker):
 
     def flush(self, force=False):
         now = tz_now()
-        if force or (time.time() - self.last_flush) > settings.JOB_EVENT_BUFFER_SECONDS or any([len(events) >= 1000 for events in self.buff.values()]):
+        if (
+            force
+            or (time.time() - self.last_flush) > settings.JOB_EVENT_BUFFER_SECONDS
+            or any(len(events) >= 1000 for events in self.buff.values())
+        ):
             metrics_bulk_events_saved = 0
             metrics_singular_events_saved = 0
             metrics_events_batch_save_errors = 0
@@ -186,7 +190,9 @@ class CallbackBrokerWorker(BaseWorker):
                         if 'guid' in body:
                             GuidMiddleware.set_guid(body['guid'])
                         final_counter = body.get('final_counter', 0)
-                        logger.info('Event processing is finished for Job {}, sending notifications'.format(job_identifier))
+                        logger.info(
+                            f'Event processing is finished for Job {job_identifier}, sending notifications'
+                        )
                         # EOF events are sent when stdout for the running task is
                         # closed. don't actually persist them to the database; we
                         # just use them to report `summary` websocket events as an
@@ -205,7 +211,7 @@ class CallbackBrokerWorker(BaseWorker):
                         elif hasattr(uj, 'send_notification_templates'):
                             handle_success_and_failure_notifications.apply_async([uj.id])
                     except Exception:
-                        logger.exception('Worker failed to emit notifications: Job {}'.format(job_identifier))
+                        logger.exception(f'Worker failed to emit notifications: Job {job_identifier}')
                     finally:
                         self.subsystem_metrics.inc('callback_receiver_events_in_memory', -1)
                         GuidMiddleware.set_guid('')
@@ -240,4 +246,4 @@ class CallbackBrokerWorker(BaseWorker):
         except Exception as exc:
             tb = traceback.format_exc()
             logger.error('Callback Task Processor Raised Exception: %r', exc)
-            logger.error('Detail: {}'.format(tb))
+            logger.error(f'Detail: {tb}')

@@ -25,7 +25,11 @@ else:
 
 
 def signame(sig):
-    return dict((k, v) for v, k in signal.__dict__.items() if v.startswith('SIG') and not v.startswith('SIG_'))[sig]
+    return {
+        k: v
+        for v, k in signal.__dict__.items()
+        if v.startswith('SIG') and not v.startswith('SIG_')
+    }[sig]
 
 
 class WorkerSignalHandler:
@@ -78,7 +82,7 @@ class AWXConsumerBase(object):
             for worker in self.pool.workers:
                 worker.quit()
         else:
-            logger.error('unrecognized control message: {}'.format(control))
+            logger.error(f'unrecognized control message: {control}')
 
     def process_task(self, body):
         if 'control' in body:
@@ -118,7 +122,7 @@ class AWXConsumerBase(object):
 
     def stop(self, signum, frame):
         self.should_stop = True
-        logger.warn('received {}, stopping'.format(signame(signum)))
+        logger.warn(f'received {signame(signum)}, stopping')
         self.worker.on_stop()
         raise SystemExit()
 
@@ -176,7 +180,7 @@ class BaseWorker(object):
             except QueueEmpty:
                 continue
             except Exception as e:
-                logger.error("Exception on worker {}, restarting: ".format(idx) + str(e))
+                logger.error(f"Exception on worker {idx}, restarting: {str(e)}")
                 continue
             try:
                 for conn in db.connections.all():
@@ -188,7 +192,7 @@ class BaseWorker(object):
                 if 'uuid' in body:
                     uuid = body['uuid']
                     finished.put(uuid)
-        logger.debug('worker exiting gracefully pid:{}'.format(os.getpid()))
+        logger.debug(f'worker exiting gracefully pid:{os.getpid()}')
 
     def perform_work(self, body):
         raise NotImplementedError()

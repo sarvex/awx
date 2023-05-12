@@ -27,13 +27,10 @@ def migrate_galaxy_settings(apps, schema_editor):
     galaxy_type = CredentialType.objects.get(kind='galaxy')
     private_galaxy_url = Setting.objects.filter(key='PRIMARY_GALAXY_URL').first()
 
-    # by default, prior versions of AWX automatically pulled content
-    # from galaxy.ansible.com
-    public_galaxy_enabled = True
     public_galaxy_setting = Setting.objects.filter(key='PUBLIC_GALAXY_ENABLED').first()
-    if public_galaxy_setting and public_galaxy_setting.value is False:
-        # ...UNLESS this behavior was explicitly disabled via this setting
-        public_galaxy_enabled = False
+    public_galaxy_enabled = (
+        not public_galaxy_setting or public_galaxy_setting.value is not False
+    )
     try:
         # Needed for old migrations
         public_galaxy_credential = Credential(

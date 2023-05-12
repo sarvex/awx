@@ -37,9 +37,11 @@ def sanitize_event_keys(kwargs, valid_keys):
 
     # Truncate certain values over 1k
     for key in ['play', 'role', 'task', 'playbook']:
-        if isinstance(kwargs.get('event_data', {}).get(key), str):
-            if len(kwargs['event_data'][key]) > 1024:
-                kwargs['event_data'][key] = Truncator(kwargs['event_data'][key]).chars(1024)
+        if (
+            isinstance(kwargs.get('event_data', {}).get(key), str)
+            and len(kwargs['event_data'][key]) > 1024
+        ):
+            kwargs['event_data'][key] = Truncator(kwargs['event_data'][key]).chars(1024)
 
 
 def create_host_status_counts(event_data):
@@ -71,10 +73,10 @@ def emit_event_detail(event):
     }[cls]
     url = ''
     if isinstance(event, JobEvent):
-        url = '/api/v2/job_events/{}'.format(event.id)
+        url = f'/api/v2/job_events/{event.id}'
     if isinstance(event, AdHocCommandEvent):
-        url = '/api/v2/ad_hoc_command_events/{}'.format(event.id)
-    group = camelcase_to_underscore(cls.__name__) + 's'
+        url = f'/api/v2/ad_hoc_command_events/{event.id}'
+    group = f'{camelcase_to_underscore(cls.__name__)}s'
     timestamp = event.created.isoformat()
     consumers.emit_channel_notification(
         '-'.join([group, str(getattr(event, relation))]),
@@ -288,15 +290,15 @@ class BasePlaybookEvent(CreatedModifiedModel):
         msg = self.get_event_display()
         if self.event == 'playbook_on_play_start':
             if self.play:
-                msg = "%s (%s)" % (msg, self.play)
+                msg = f"{msg} ({self.play})"
         elif self.event == 'playbook_on_task_start':
             if self.task:
                 if self.event_data.get('is_conditional', False):
                     msg = 'Handler Notified'
                 if self.role:
-                    msg = '%s (%s | %s)' % (msg, self.role, self.task)
+                    msg = f'{msg} ({self.role} | {self.task})'
                 else:
-                    msg = "%s (%s)" % (msg, self.task)
+                    msg = f"{msg} ({self.task})"
 
         # Change display for runner events triggered by async polling.  Some of
         # these events may not show in most cases, due to filterting them out
@@ -339,9 +341,8 @@ class BasePlaybookEvent(CreatedModifiedModel):
         res = event_data.get('res', None)
         if self.event in self.FAILED_EVENTS and not event_data.get('ignore_errors', False):
             self.failed = True
-        if isinstance(res, dict):
-            if res.get('changed', False):
-                self.changed = True
+        if isinstance(res, dict) and res.get('changed', False):
+            self.changed = True
         if self.event == 'playbook_on_stats':
             try:
                 failures_dict = event_data.get('failures', {})
@@ -453,10 +454,7 @@ class BasePlaybookEvent(CreatedModifiedModel):
         event = cls(**kwargs)
         if workflow_job_id:
             setattr(event, 'workflow_job_id', workflow_job_id)
-        # shouldn't job_created _always_ be present?
-        # if it's not, how could we save the event to the db?
-        job_created = kwargs.pop('job_created', None)
-        if job_created:
+        if job_created := kwargs.pop('job_created', None):
             setattr(event, 'job_created', job_created)
         setattr(event, 'host_map', host_map)
         event._update_from_event_data()
@@ -519,7 +517,7 @@ class JobEvent(BasePlaybookEvent):
         return reverse('api:job_event_detail', kwargs={'pk': self.pk}, request=request)
 
     def __str__(self):
-        return u'%s @ %s' % (self.get_event_display2(), self.created.isoformat())
+        return f'{self.get_event_display2()} @ {self.created.isoformat()}'
 
     def _hostnames(self):
         hostnames = set()
@@ -534,20 +532,24 @@ class JobEvent(BasePlaybookEvent):
         with ignore_inventory_computed_fields():
             try:
                 if not self.job or not self.job.inventory:
-                    logger.info('Event {} missing job or inventory, host summaries not updated'.format(self.pk))
+                    logger.info(
+                        f'Event {self.pk} missing job or inventory, host summaries not updated'
+                    )
                     return
             except ObjectDoesNotExist:
-                logger.info('Event {} missing job or inventory, host summaries not updated'.format(self.pk))
+                logger.info(
+                    f'Event {self.pk} missing job or inventory, host summaries not updated'
+                )
                 return
             job = self.job
 
             from awx.main.models import Host, JobHostSummary, HostMetric  # circular import
 
             all_hosts = Host.objects.filter(pk__in=self.host_map.values()).only('id', 'name')
-            existing_host_ids = set(h.id for h in all_hosts)
+            existing_host_ids = {h.id for h in all_hosts}
 
-            summaries = dict()
-            updated_hosts_list = list()
+            summaries = {}
+            updated_hosts_list = []
             for host in hostnames:
                 updated_hosts_list.append(host.lower())
                 host_id = self.host_map.get(host, None)
@@ -567,7 +569,12 @@ class JobEvent(BasePlaybookEvent):
 
             # update the last_job_id and last_job_host_summary_id
             # in single queries
-            host_mapping = dict((summary['host_id'], summary['id']) for summary in JobHostSummary.objects.filter(job_id=job.id).values('id', 'host_id'))
+            host_mapping = {
+                summary['host_id']: summary['id']
+                for summary in JobHostSummary.objects.filter(job_id=job.id).values(
+                    'id', 'host_id'
+                )
+            }
             updated_hosts = set()
             for h in all_hosts:
                 # if the hostname *shows up* in the playbook_on_stats event
@@ -597,7 +604,9 @@ class UnpartitionedJobEvent(JobEvent):
         proxy = True
 
 
-UnpartitionedJobEvent._meta.db_table = '_unpartitioned_' + JobEvent._meta.db_table  # noqa
+UnpartitionedJobEvent._meta.db_table = (
+    f'_unpartitioned_{JobEvent._meta.db_table}'
+)
 
 
 class ProjectUpdateEvent(BasePlaybookEvent):
@@ -635,7 +644,9 @@ class UnpartitionedProjectUpdateEvent(ProjectUpdateEvent):
         proxy = True
 
 
-UnpartitionedProjectUpdateEvent._meta.db_table = '_unpartitioned_' + ProjectUpdateEvent._meta.db_table  # noqa
+UnpartitionedProjectUpdateEvent._meta.db_table = (
+    f'_unpartitioned_{ProjectUpdateEvent._meta.db_table}'
+)
 
 
 class BaseCommandEvent(CreatedModifiedModel):
@@ -689,7 +700,7 @@ class BaseCommandEvent(CreatedModifiedModel):
     )
 
     def __str__(self):
-        return u'%s @ %s' % (self.get_event_display(), self.created.isoformat())
+        return f'{self.get_event_display()} @ {self.created.isoformat()}'
 
     @classmethod
     def create_from_data(cls, **kwargs):
@@ -822,9 +833,10 @@ class AdHocCommandEvent(BaseCommandEvent):
 
     def _update_from_event_data(self):
         res = self.event_data.get('res', None)
-        if self.event in self.FAILED_EVENTS:
-            if not self.event_data.get('ignore_errors', False):
-                self.failed = True
+        if self.event in self.FAILED_EVENTS and not self.event_data.get(
+            'ignore_errors', False
+        ):
+            self.failed = True
         if isinstance(res, dict) and res.get('changed', False):
             self.changed = True
 
@@ -836,7 +848,9 @@ class UnpartitionedAdHocCommandEvent(AdHocCommandEvent):
         proxy = True
 
 
-UnpartitionedAdHocCommandEvent._meta.db_table = '_unpartitioned_' + AdHocCommandEvent._meta.db_table  # noqa
+UnpartitionedAdHocCommandEvent._meta.db_table = (
+    f'_unpartitioned_{AdHocCommandEvent._meta.db_table}'
+)
 
 
 class InventoryUpdateEvent(BaseCommandEvent):
@@ -881,7 +895,9 @@ class UnpartitionedInventoryUpdateEvent(InventoryUpdateEvent):
         proxy = True
 
 
-UnpartitionedInventoryUpdateEvent._meta.db_table = '_unpartitioned_' + InventoryUpdateEvent._meta.db_table  # noqa
+UnpartitionedInventoryUpdateEvent._meta.db_table = (
+    f'_unpartitioned_{InventoryUpdateEvent._meta.db_table}'
+)
 
 
 class SystemJobEvent(BaseCommandEvent):
@@ -926,4 +942,6 @@ class UnpartitionedSystemJobEvent(SystemJobEvent):
         proxy = True
 
 
-UnpartitionedSystemJobEvent._meta.db_table = '_unpartitioned_' + SystemJobEvent._meta.db_table  # noqa
+UnpartitionedSystemJobEvent._meta.db_table = (
+    f'_unpartitioned_{SystemJobEvent._meta.db_table}'
+)

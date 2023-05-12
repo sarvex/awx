@@ -20,10 +20,9 @@ class Command(BaseCommand):
                     minimum = start[relation]
                     cursor.execute(f"SELECT MAX(id) - MIN(id) FROM {relation} WHERE id > {minimum} AND modified > now() - '1 minute'::interval;")
                     events = cursor.fetchone()[0] or 0
-                    lines.append(f'↳  last minute {events}')
-                    lines.append('')
+                    lines.extend((f'↳  last minute {events}', ''))
                 if clear:
-                    for i in range(12):
+                    for _ in range(12):
                         sys.stdout.write('\x1b[1A\x1b[2K')
                 for line in lines:
                     print(line)

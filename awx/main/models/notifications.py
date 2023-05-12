@@ -81,9 +81,7 @@ class NotificationTemplate(CommonModelNameNotUnique):
         potential_template = self.messages.get(condition, {})
         if potential_template == {}:
             return False
-        if potential_template.get('message', {}) == {}:
-            return False
-        return True
+        return potential_template.get('message', {}) != {}
 
     def get_message(self, condition):
         return self.messages.get(condition, {})
@@ -176,9 +174,8 @@ class NotificationTemplate(CommonModelNameNotUnique):
         sender = self.notification_configuration.pop(self.notification_class.sender_parameter, None)
         notification_configuration = deepcopy(self.notification_configuration)
         for field, params in self.notification_class.init_parameters.items():
-            if field not in notification_configuration:
-                if 'default' in params:
-                    notification_configuration[field] = params['default']
+            if field not in notification_configuration and 'default' in params:
+                notification_configuration[field] = params['default']
         backend_obj = self.notification_class(**notification_configuration)
         notification_obj = EmailMessage(subject, backend_obj.format_body(body), sender, recipients)
         with set_environ(**settings.AWX_TASK_ENV):
@@ -320,12 +317,14 @@ class JobNotificationMixin(object):
         """Returns a stub context that can be used for validating notification messages.
         Context has the same structure as the context that will actually be used to render
         a notification message."""
-        context = {
+        return {
             'job': {
                 'allow_simultaneous': False,
                 'artifacts': {},
                 'controller_node': 'foo_controller',
-                'created': datetime.datetime(2018, 11, 13, 6, 4, 0, 0, tzinfo=datetime.timezone.utc),
+                'created': datetime.datetime(
+                    2018, 11, 13, 6, 4, 0, 0, tzinfo=datetime.timezone.utc
+                ),
                 'custom_virtualenv': 'my_venv',
                 'description': 'Sample job description',
                 'diff_mode': False,
@@ -335,7 +334,16 @@ class JobNotificationMixin(object):
                 'finished': False,
                 'force_handlers': False,
                 'forks': 0,
-                'host_status_counts': {'skipped': 1, 'ok': 5, 'changed': 3, 'failures': 0, 'dark': 0, 'failed': False, 'processed': 0, 'rescued': 0},
+                'host_status_counts': {
+                    'skipped': 1,
+                    'ok': 5,
+                    'changed': 3,
+                    'failures': 0,
+                    'dark': 0,
+                    'failed': False,
+                    'processed': 0,
+                    'rescued': 0,
+                },
                 'id': 42,
                 'job_explanation': 'Sample job explanation',
                 'job_slice_count': 1,
@@ -344,7 +352,9 @@ class JobNotificationMixin(object):
                 'job_type': 'run',
                 'launch_type': 'workflow',
                 'limit': 'bar_limit',
-                'modified': datetime.datetime(2018, 12, 13, 6, 4, 0, 0, tzinfo=datetime.timezone.utc),
+                'modified': datetime.datetime(
+                    2018, 12, 13, 6, 4, 0, 0, tzinfo=datetime.timezone.utc
+                ),
                 'name': 'Stub JobTemplate',
                 'playbook': 'ping.yml',
                 'scm_branch': '',
@@ -354,7 +364,12 @@ class JobNotificationMixin(object):
                 'started': '2019-07-29T17:38:14.137461Z',
                 'status': 'running',
                 'summary_fields': {
-                    'created_by': {'first_name': '', 'id': 1, 'last_name': '', 'username': 'admin'},
+                    'created_by': {
+                        'first_name': '',
+                        'id': 1,
+                        'last_name': '',
+                        'username': 'admin',
+                    },
                     'instance_group': {'id': 1, 'name': 'tower'},
                     'inventory': {
                         'description': 'Sample inventory description',
@@ -370,14 +385,26 @@ class JobNotificationMixin(object):
                         'total_hosts': 1,
                         'total_inventory_sources': 0,
                     },
-                    'job_template': {'description': 'Sample job template description', 'id': 39, 'name': 'Stub JobTemplate'},
+                    'job_template': {
+                        'description': 'Sample job template description',
+                        'id': 39,
+                        'name': 'Stub JobTemplate',
+                    },
                     'labels': {'count': 0, 'results': []},
-                    'project': {'description': 'Sample project description', 'id': 38, 'name': 'Stub project', 'scm_type': 'git', 'status': 'successful'},
+                    'project': {
+                        'description': 'Sample project description',
+                        'id': 38,
+                        'name': 'Stub project',
+                        'scm_type': 'git',
+                        'status': 'successful',
+                    },
                     'schedule': {
                         'description': 'Sample schedule',
                         'id': 42,
                         'name': 'Stub schedule',
-                        'next_run': datetime.datetime(2038, 1, 1, 0, 0, 0, 0, tzinfo=datetime.timezone.utc),
+                        'next_run': datetime.datetime(
+                            2038, 1, 1, 0, 0, 0, 0, tzinfo=datetime.timezone.utc
+                        ),
                     },
                     'unified_job_template': {
                         'description': 'Sample unified job template description',
@@ -414,8 +441,6 @@ class JobNotificationMixin(object):
  'created_by': 'admin'}""",
         }
 
-        return context
-
     def context(self, serialized_job):
         """Returns a dictionary that can be used for rendering notification messages.
         The context will contain allowed content retrieved from a serialized job object
@@ -424,7 +449,9 @@ class JobNotificationMixin(object):
         job_context = {'host_status_counts': {}}
         summary = None
         try:
-            has_event_property = any([f for f in self.event_class._meta.fields if f.name == 'event'])
+            has_event_property = any(
+                f for f in self.event_class._meta.fields if f.name == 'event'
+            )
         except NotImplementedError:
             has_event_property = False
         if has_event_property:

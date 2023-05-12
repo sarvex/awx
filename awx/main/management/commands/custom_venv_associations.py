@@ -23,9 +23,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         # look organiztions and unified job templates (which include JTs, workflows, and Inventory updates)
         super(Command, self).__init__()
-        results = {}
-        path = options.get('path')
-        if path:
+        if path := options.get('path'):
             all_venvs = get_custom_venv_choices()
             if path[0] in all_venvs:  # verify this is a valid path
                 path = path[0]
@@ -33,10 +31,12 @@ class Command(BaseCommand):
                 jts = [{"name": jt.name, "id": jt.id} for jt in JobTemplate.objects.filter(custom_virtualenv=path)]
                 proj = [{"name": proj.name, "id": proj.id} for proj in Project.objects.filter(custom_virtualenv=path)]
                 invsrc = [{"name": inv.name, "id": inv.id} for inv in InventorySource.objects.filter(custom_virtualenv=path)]
-                results["organizations"] = orgs
-                results["job_templates"] = jts
-                results["projects"] = proj
-                results["inventory_sources"] = invsrc
+                results = {
+                    "organizations": orgs,
+                    "job_templates": jts,
+                    "projects": proj,
+                    "inventory_sources": invsrc,
+                }
                 if not options.get('q'):
                     msg = [
                         '# Virtual Environments Associations:',

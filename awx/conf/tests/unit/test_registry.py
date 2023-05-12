@@ -54,7 +54,7 @@ def test_simple_setting_unregistration(reg):
 def test_duplicate_setting_registration(reg):
     "ensure that settings cannot be registered twice."
     with pytest.raises(ImproperlyConfigured):
-        for i in range(2):
+        for _ in range(2):
             reg.register('AWX_SOME_SETTING_ENABLED', field_class=fields.BooleanField, category=_('System'), category_slug='system')
 
 
@@ -83,7 +83,9 @@ def test_get_dependent_settings(reg):
     reg.register(
         'AWX_SOME_DEPENDENT_SETTING', field_class=fields.BooleanField, category=_('System'), category_slug='system', depends_on=['AWX_SOME_SETTING_ENABLED']
     )
-    assert reg.get_dependent_settings('AWX_SOME_SETTING_ENABLED') == set(['AWX_SOME_DEPENDENT_SETTING'])
+    assert reg.get_dependent_settings('AWX_SOME_SETTING_ENABLED') == {
+        'AWX_SOME_DEPENDENT_SETTING'
+    }
 
 
 def test_get_registered_categories(reg):

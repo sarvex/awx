@@ -117,22 +117,22 @@ def config(since, **kwargs):
 
 @register('counts', '1.1', description=_('Counts of objects such as organizations, inventories, and projects'))
 def counts(since, **kwargs):
-    counts = {}
-    for cls in (
-        models.Organization,
-        models.Team,
-        models.User,
-        models.Inventory,
-        models.Credential,
-        models.Project,
-        models.JobTemplate,
-        models.WorkflowJobTemplate,
-        models.Host,
-        models.Schedule,
-        models.NotificationTemplate,
-    ):
-        counts[camelcase_to_underscore(cls.__name__)] = cls.objects.count()
-
+    counts = {
+        camelcase_to_underscore(cls.__name__): cls.objects.count()
+        for cls in (
+            models.Organization,
+            models.Team,
+            models.User,
+            models.Inventory,
+            models.Credential,
+            models.Project,
+            models.JobTemplate,
+            models.WorkflowJobTemplate,
+            models.Host,
+            models.Schedule,
+            models.NotificationTemplate,
+        )
+    }
     inv_counts = dict(models.Inventory.objects.order_by().values_list('kind').annotate(Count('kind')))
     inv_counts['normal'] = inv_counts.get('', 0)
     inv_counts.pop('', None)
@@ -163,26 +163,31 @@ def counts(since, **kwargs):
 
 @register('org_counts', '1.0', description=_('Counts of users and teams by organization'))
 def org_counts(since, **kwargs):
-    counts = {}
-    for org in models.Organization.objects.annotate(num_users=Count('member_role__members', distinct=True), num_teams=Count('teams', distinct=True)).values(
-        'name', 'id', 'num_users', 'num_teams'
-    ):
-        counts[org['id']] = {'name': org['name'], 'users': org['num_users'], 'teams': org['num_teams']}
-    return counts
+    return {
+        org['id']: {
+            'name': org['name'],
+            'users': org['num_users'],
+            'teams': org['num_teams'],
+        }
+        for org in models.Organization.objects.annotate(
+            num_users=Count('member_role__members', distinct=True),
+            num_teams=Count('teams', distinct=True),
+        ).values('name', 'id', 'num_users', 'num_teams')
+    }
 
 
 @register('cred_type_counts', '1.0', description=_('Counts of credentials by credential type'))
 def cred_type_counts(since, **kwargs):
-    counts = {}
-    for cred_type in models.CredentialType.objects.annotate(num_credentials=Count('credentials', distinct=True)).values(
-        'name', 'id', 'managed', 'num_credentials'
-    ):
-        counts[cred_type['id']] = {
+    return {
+        cred_type['id']: {
             'name': cred_type['name'],
             'credential_count': cred_type['num_credentials'],
             'managed': cred_type['managed'],
         }
-    return counts
+        for cred_type in models.CredentialType.objects.annotate(
+            num_credentials=Count('credentials', distinct=True)
+        ).values('name', 'id', 'managed', 'num_credentials')
+    }
 
 
 @register('inventory_counts', '1.2', description=_('Inventories, their inventory sources, and host counts'))
@@ -193,9 +198,11 @@ def inventory_counts(since, **kwargs):
         .annotate(num_sources=Count('inventory_sources', distinct=True), num_hosts=Count('hosts', distinct=True))
         .only('id', 'name', 'kind')
     ):
-        source_list = []
-        for source in inv.inventory_sources.filter().annotate(num_hosts=Count('hosts', distinct=True)).values('name', 'source', 'num_hosts'):
-            source_list.append(source)
+        source_list = list(
+            inv.inventory_sources.filter()
+            .annotate(num_hosts=Count('hosts', distinct=True))
+            .values('name', 'source', 'num_hosts')
+        )
         counts[inv.id] = {'name': inv.name, 'kind': inv.kind, 'hosts': inv.num_hosts, 'sources': inv.num_sources, 'source_list': source_list}
 
     for smart_inv in models.Inventory.objects.filter(kind='smart'):
@@ -205,7 +212,7 @@ def inventory_counts(since, **kwargs):
 
 @register('projects_by_scm_type', '1.0', description=_('Counts of projects by source control type'))
 def projects_by_scm_type(since, **kwargs):
-    counts = dict((t[0] or 'manual', 0) for t in models.Project.SCM_TYPE_CHOICES)
+    counts = {t[0] or 'manual': 0 for t in models.Project.SCM_TYPE_CHOICES}
     for result in models.Project.objects.values('scm_type').annotate(count=Count('scm_type')).order_by('scm_type'):
         counts[result['scm_type'] or 'manual'] = result['count']
     return counts
@@ -237,8 +244,11 @@ def instance_info(since, include_hostnames=False, **kwargs):
 
 
 def job_counts(since, **kwargs):
-    counts = {}
-    counts['total_jobs'] = models.UnifiedJob.objects.exclude(launch_type='sync').count()
+    counts = {
+        'total_jobs': models.UnifiedJob.objects.exclude(
+            launch_type='sync'
+        ).count()
+    }
     counts['status'] = dict(models.UnifiedJob.objects.exclude(launch_type='sync').values_list('status').annotate(Count('status')).order_by())
     counts['launch_type'] = dict(models.UnifiedJob.objects.exclude(launch_type='sync').values_list('launch_type').annotate(Count('launch_type')).order_by())
     return counts
@@ -263,11 +273,11 @@ def job_instance_counts(since, **kwargs):
 
 @register('query_info', '1.0', description=_('Metadata about the analytics collected'))
 def query_info(since, collection_type, until, **kwargs):
-    query_info = {}
-    query_info['last_run'] = str(since)
-    query_info['current_time'] = str(until)
-    query_info['collection_type'] = collection_type
-    return query_info
+    return {
+        'last_run': str(since),
+        'current_time': str(until),
+        'collection_type': collection_type,
+    }
 
 
 '''
@@ -291,11 +301,11 @@ class FileSplitter(io.StringIO):
         if self.currentfile:
             self.currentfile.close()
         self.counter = 0
-        fname = '{}_split{}'.format(self.filespec, len(self.files))
+        fname = f'{self.filespec}_split{len(self.files)}'
         self.currentfile = open(fname, 'w', encoding='utf-8')
         self.files.append(fname)
         if self.header:
-            self.currentfile.write('{}\n'.format(self.header))
+            self.currentfile.write(f'{self.header}\n')
 
     def file_list(self):
         self.currentfile.close()
@@ -320,7 +330,7 @@ class FileSplitter(io.StringIO):
 
 
 def _copy_table(table, query, path):
-    file_path = os.path.join(path, table + '_table.csv')
+    file_path = os.path.join(path, f'{table}_table.csv')
     file = FileSplitter(filespec=file_path)
     with connection.cursor() as cursor:
         cursor.copy_expert(query, file)
@@ -332,7 +342,7 @@ def _events_table(since, full_path, until, tbl, where_column, project_job_create
         query = f'''COPY (SELECT {tbl}.id,
                           {tbl}.created,
                           {tbl}.modified,
-                          {tbl + '.job_created' if project_job_created else 'NULL'} as job_created,
+                          {f'{tbl}.job_created' if project_job_created else 'NULL'} as job_created,
                           {tbl}.uuid,
                           {tbl}.parent_uuid,
                           {tbl}.event,

@@ -67,4 +67,4 @@ class PlainTextCleaner(object):
     def remove_sensitive(cleartext, sensitive):
         if sensitive == '':
             return cleartext
-        return re.sub(r'%s' % re.escape(sensitive), '$encrypted$', cleartext)
+        return re.sub(f'{re.escape(sensitive)}', '$encrypted$', cleartext)

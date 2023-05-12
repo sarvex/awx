@@ -21,7 +21,10 @@ class Command(BaseCommand):
         history = options['history']
         ignore = options['ignore']
 
-        print('## ' + JobTemplate.objects.get(pk=jt).name + f' (last {history} runs)\n')
+        print(
+            f'## {JobTemplate.objects.get(pk=jt).name}'
+            + f' (last {history} runs)\n'
+        )
         with connection.cursor() as cursor:
             cursor.execute(
                 f'''
@@ -51,7 +54,7 @@ class Command(BaseCommand):
         def format_td(x):
             return str(x).split('.')[0]
 
-        fastest = dict()
+        fastest = {}
         for event in slowest_events:
             _id, job_id, host, duration, task, action, playbook = event
             playbook = playbook.rsplit('/')[-1]
@@ -60,7 +63,7 @@ class Command(BaseCommand):
             if host:
                 fastest[(action, playbook)] = (_id, host, format_td(duration))
 
-        host_counts = dict()
+        host_counts = {}
         warned = set()
         print(f'slowest tasks (--threshold={threshold})\n---')
 
@@ -77,7 +80,7 @@ class Command(BaseCommand):
             fastest_match = fastest.get((action, playbook))
             if fastest_match[2] != human_duration and (host, action, playbook) not in warned:
                 warned.add((host, action, playbook))
-                fastest_summary = ' ' + self.style.WARNING(f'{fastest_match[1]} ran this in {fastest_match[2]}s at /api/v2/job_events/{fastest_match[0]}/')
+                fastest_summary = f" {self.style.WARNING(f'{fastest_match[1]} ran this in {fastest_match[2]}s at /api/v2/job_events/{fastest_match[0]}/')}"
 
             url = f'/api/v2/jobs/{job_id}/'
             print(' -- '.join([url, host, human_duration, action, task, playbook]) + fastest_summary)
@@ -89,7 +92,7 @@ class Command(BaseCommand):
         print('\nslowest hosts\n---')
         for h, matches in host_counts:
             total = len(matches)
-            total_seconds = sum([e.total_seconds() for e in matches])
+            total_seconds = sum(e.total_seconds() for e in matches)
             print(f'{h} had {total} tasks that ran longer than {threshold} second(s) for a total of {total_seconds}')
 
         print('')

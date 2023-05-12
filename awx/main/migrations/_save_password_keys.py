@@ -3,9 +3,11 @@ def survey_password_variables(survey_spec):
     # Get variables that are type password
     if 'spec' not in survey_spec:
         return vars
-    for survey_element in survey_spec['spec']:
-        if 'type' in survey_element and survey_element['type'] == 'password':
-            vars.append(survey_element['variable'])
+    vars.extend(
+        survey_element['variable']
+        for survey_element in survey_spec['spec']
+        if 'type' in survey_element and survey_element['type'] == 'password'
+    )
     return vars
 
 
@@ -20,8 +22,6 @@ def migrate_survey_passwords(apps, schema_editor):
         jt = job.job_template
         if jt.survey_spec is not None and jt.survey_enabled:
             password_list = survey_password_variables(jt.survey_spec)
-            hide_password_dict = {}
-            for password in password_list:
-                hide_password_dict[password] = "$encrypted$"
+            hide_password_dict = {password: "$encrypted$" for password in password_list}
             job.survey_passwords = hide_password_dict
             job.save()

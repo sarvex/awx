@@ -60,4 +60,4 @@ def operations(squashed, applied=False):
     squashed_keys, key_index = squash_data(squashed)
     op_keys = squashed_keys[:key_index] if applied else squashed_keys[key_index:]
     ops = [squashed[op_key] for op_key in op_keys]
-    return [op for op in chain.from_iterable(ops)]
+    return list(chain.from_iterable(ops))

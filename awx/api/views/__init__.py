@@ -633,10 +633,10 @@ class AuthView(APIView):
             if name == 'saml':
                 backend_data['metadata_url'] = reverse('sso:saml_metadata')
                 for idp in sorted(settings.SOCIAL_AUTH_SAML_ENABLED_IDPS.keys()):
-                    saml_backend_data = dict(backend_data.items())
-                    saml_backend_data['login_url'] = '%s?idp=%s' % (login_url, idp)
-                    full_backend_name = '%s:%s' % (name, idp)
-                    if (err_backend == full_backend_name or err_backend == name) and err_message:
+                    saml_backend_data = dict(backend_data)
+                    saml_backend_data['login_url'] = f'{login_url}?idp={idp}'
+                    full_backend_name = f'{name}:{idp}'
+                    if err_backend in [full_backend_name, name] and err_message:
                         saml_backend_data['error'] = err_message
                     data[full_backend_name] = saml_backend_data
             else:
@@ -699,10 +699,12 @@ class TeamRolesList(SubListAttachDetachAPIView):
 
         team = get_object_or_404(models.Team, pk=self.kwargs['pk'])
         credential_content_type = ContentType.objects.get_for_model(models.Credential)
-        if role.content_type == credential_content_type:
-            if not role.content_object.organization or role.content_object.organization.id != team.organization.id:
-                data = dict(msg=_("You cannot grant credential access to a team when the Organization field isn't set, or belongs to a different organization"))
-                return Response(data, status=status.HTTP_400_BAD_REQUEST)
+        if role.content_type == credential_content_type and (
+            not role.content_object.organization
+            or role.content_object.organization.id != team.organization.id
+        ):
+            data = dict(msg=_("You cannot grant credential access to a team when the Organization field isn't set, or belongs to a different organization"))
+            return Response(data, status=status.HTTP_400_BAD_REQUEST)
 
         return super(TeamRolesList, self).post(request, *args, **kwargs)
 
@@ -939,18 +941,16 @@ class ProjectUpdateView(RetrieveAPIView):
 
     def post(self, request, *args, **kwargs):
         obj = self.get_object()
-        if obj.can_update:
-            project_update = obj.update()
-            if not project_update:
-                return Response({}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                data = OrderedDict()
-                data['project_update'] = project_update.id
-                data.update(serializers.ProjectUpdateSerializer(project_update, context=self.get_serializer_context()).to_representation(project_update))
-                headers = {'Location': project_update.get_absolute_url(request=request)}
-                return Response(data, headers=headers, status=status.HTTP_202_ACCEPTED)
-        else:
+        if not obj.can_update:
             return self.http_method_not_allowed(request, *args, **kwargs)
+        if project_update := obj.update():
+            data = OrderedDict()
+            data['project_update'] = project_update.id
+            data.update(serializers.ProjectUpdateSerializer(project_update, context=self.get_serializer_context()).to_representation(project_update))
+            headers = {'Location': project_update.get_absolute_url(request=request)}
+            return Response(data, headers=headers, status=status.HTTP_202_ACCEPTED)
+        else:
+            return Response({}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ProjectUpdateList(ListAPIView):
@@ -1013,11 +1013,10 @@ class ProjectUpdateCancel(RetrieveAPIView):
 
     def post(self, request, *args, **kwargs):
         obj = self.get_object()
-        if obj.can_cancel:
-            obj.cancel()
-            return Response(status=status.HTTP_202_ACCEPTED)
-        else:
+        if not obj.can_cancel:
             return self.http_method_not_allowed(request, *args, **kwargs)
+        obj.cancel()
+        return Response(status=status.HTTP_202_ACCEPTED)
 
 
 class ProjectUpdateNotificationsList(SubListAPIView):
@@ -1356,10 +1355,10 @@ class UserDetail(RetrieveUpdateDestroyAPIView):
 
     def destroy(self, request, *args, **kwargs):
         obj = self.get_object()
-        can_delete = request.user.can_access(models.User, 'delete', obj)
-        if not can_delete:
+        if can_delete := request.user.can_access(models.User, 'delete', obj):
+            return super(UserDetail, self).destroy(request, *args, **kwargs)
+        else:
             raise PermissionDenied(_('Cannot delete user.'))
-        return super(UserDetail, self).destroy(request, *args, **kwargs)
 
 
 class UserAccessList(ResourceAccessList):
@@ -1549,18 +1548,19 @@ class CredentialExternalTest(SubDetailAPIView):
 
     def post(self, request, *args, **kwargs):
         obj = self.get_object()
-        backend_kwargs = {}
-        for field_name, value in obj.inputs.items():
-            backend_kwargs[field_name] = obj.get_input(field_name)
+        backend_kwargs = {
+            field_name: obj.get_input(field_name)
+            for field_name, value in obj.inputs.items()
+        }
         for field_name, value in request.data.get('inputs', {}).items():
             if value != '$encrypted$':
                 backend_kwargs[field_name] = value
-        backend_kwargs.update(request.data.get('metadata', {}))
+        backend_kwargs |= request.data.get('metadata', {})
         try:
             obj.credential_type.plugin.backend(**backend_kwargs)
             return Response({}, status=status.HTTP_202_ACCEPTED)
         except requests.exceptions.HTTPError as exc:
-            message = 'HTTP {}'.format(exc.response.status_code)
+            message = f'HTTP {exc.response.status_code}'
             return Response({'inputs': message}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as exc:
             message = exc.__class__.__name__
@@ -1617,7 +1617,7 @@ class CredentialTypeExternalTest(SubDetailAPIView):
             obj.plugin.backend(**backend_kwargs)
             return Response({}, status=status.HTTP_202_ACCEPTED)
         except requests.exceptions.HTTPError as exc:
-            message = 'HTTP {}'.format(exc.response.status_code)
+            message = f'HTTP {exc.response.status_code}'
             return Response({'inputs': message}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as exc:
             message = exc.__class__.__name__
@@ -1645,8 +1645,7 @@ class HostList(HostRelatedSearchMixin, ListCreateAPIView):
 
     def get_queryset(self):
         qs = super(HostList, self).get_queryset()
-        filter_string = self.request.query_params.get('host_filter', None)
-        if filter_string:
+        if filter_string := self.request.query_params.get('host_filter', None):
             filter_qs = SmartFilter.query_from_string(filter_string)
             qs &= filter_qs
         return qs.distinct()
@@ -1804,7 +1803,9 @@ class EnforceParentRelationshipMixin(object):
         # HACK: Make request data mutable.
         if getattr(data, '_mutable', None) is False:
             data._mutable = True
-        data[self.enforce_parent_relationship] = getattr(self.get_parent_object(), '%s_id' % self.enforce_parent_relationship)
+        data[self.enforce_parent_relationship] = getattr(
+            self.get_parent_object(), f'{self.enforce_parent_relationship}_id'
+        )
         return super(EnforceParentRelationshipMixin, self).create(request, *args, **kwargs)
 
 
@@ -1848,7 +1849,7 @@ class GroupPotentialChildrenList(SubListAPIView):
         self.check_parent_access(parent)
         qs = self.request.user.get_queryset(self.model)
         qs = qs.filter(inventory__pk=parent.inventory.pk)
-        except_pks = set([parent.pk])
+        except_pks = {parent.pk}
         except_pks.update(parent.all_parents.values_list('pk', flat=True))
         except_pks.update(parent.all_children.values_list('pk', flat=True))
         return qs.exclude(pk__in=except_pks)
@@ -1993,8 +1994,7 @@ class InventoryScriptView(RetrieveAPIView):
         hostvars = bool(request.query_params.get('hostvars', ''))
         towervars = bool(request.query_params.get('towervars', ''))
         show_all = bool(request.query_params.get('all', ''))
-        subset = request.query_params.get('subset', '')
-        if subset:
+        if subset := request.query_params.get('subset', ''):
             if not isinstance(subset, str):
                 raise ParseError(_('Inventory subset argument must be a string.'))
             if subset.startswith('slice'):
@@ -2035,7 +2035,7 @@ class InventoryTreeView(RetrieveAPIView):
         groups_qs = inventory.groups
         groups_qs = groups_qs.prefetch_related('inventory_sources')
         all_group_data = serializers.GroupSerializer(groups_qs, many=True).data
-        all_group_data_map = dict((x['id'], x) for x in all_group_data)
+        all_group_data_map = {x['id']: x for x in all_group_data}
         tree_data = [all_group_data_map[x] for x in root_group_pks]
         for group_data in tree_data:
             self._populate_group_children(group_data, all_group_data_map, group_children_map)
@@ -2093,9 +2093,9 @@ class InventoryInventorySourcesUpdate(RetrieveAPIView):
             update_data.append(details)
         if failures and successes:
             status_code = status.HTTP_202_ACCEPTED
-        elif failures and not successes:
+        elif failures:
             status_code = status.HTTP_400_BAD_REQUEST
-        elif not failures and not successes:
+        elif not successes:
             return Response({'detail': _('No inventory sources to update.')}, status=status.HTTP_400_BAD_REQUEST)
         else:
             status_code = status.HTTP_200_OK
@@ -2242,8 +2242,9 @@ class InventorySourceCredentialsList(SubListAttachDetachAPIView):
         # or https://github.com/ansible/awx/issues/223
         if parent.credentials.exists():
             return {'msg': _("Source already has credential assigned.")}
-        error = models.InventorySource.cloud_credential_validation(parent.source, sub)
-        if error:
+        if error := models.InventorySource.cloud_credential_validation(
+            parent.source, sub
+        ):
             return {'msg': error}
         return None
 
@@ -2256,18 +2257,16 @@ class InventorySourceUpdateView(RetrieveAPIView):
 
     def post(self, request, *args, **kwargs):
         obj = self.get_object()
-        if obj.can_update:
-            update = obj.update()
-            if not update:
-                return Response({}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                headers = {'Location': update.get_absolute_url(request=request)}
-                data = OrderedDict()
-                data['inventory_update'] = update.id
-                data.update(serializers.InventoryUpdateDetailSerializer(update, context=self.get_serializer_context()).to_representation(update))
-                return Response(data, status=status.HTTP_202_ACCEPTED, headers=headers)
-        else:
+        if not obj.can_update:
             return self.http_method_not_allowed(request, *args, **kwargs)
+        if update := obj.update():
+            headers = {'Location': update.get_absolute_url(request=request)}
+            data = OrderedDict()
+            data['inventory_update'] = update.id
+            data.update(serializers.InventoryUpdateDetailSerializer(update, context=self.get_serializer_context()).to_representation(update))
+            return Response(data, status=status.HTTP_202_ACCEPTED, headers=headers)
+        else:
+            return Response({}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class InventoryUpdateList(ListAPIView):
@@ -2298,11 +2297,10 @@ class InventoryUpdateCancel(RetrieveAPIView):
 
     def post(self, request, *args, **kwargs):
         obj = self.get_object()
-        if obj.can_cancel:
-            obj.cancel()
-            return Response(status=status.HTTP_202_ACCEPTED)
-        else:
+        if not obj.can_cancel:
             return self.http_method_not_allowed(request, *args, **kwargs)
+        obj.cancel()
+        return Response(status=status.HTTP_202_ACCEPTED)
 
 
 class InventoryUpdateNotificationsList(SubListAPIView):
@@ -2349,11 +2347,8 @@ class JobTemplateLaunch(RetrieveAPIView):
             return data
         extra_vars = data.pop('extra_vars', None) or {}
         if obj:
-            needed_passwords = obj.passwords_needed_to_start
-            if needed_passwords:
-                data['credential_passwords'] = {}
-                for p in needed_passwords:
-                    data['credential_passwords'][p] = u''
+            if needed_passwords := obj.passwords_needed_to_start:
+                data['credential_passwords'] = {p: u'' for p in needed_passwords}
             else:
                 data.pop('credential_passwords')
             for v in obj.variables_needed_to_start:
@@ -2366,7 +2361,7 @@ class JobTemplateLaunch(RetrieveAPIView):
                 if not getattr(obj, ask_field_name):
                     data.pop(field, None)
                 elif field == 'inventory':
-                    data[field] = getattrd(obj, "%s.%s" % (field, 'id'), None)
+                    data[field] = getattrd(obj, f"{field}.id", None)
                 elif field == 'credentials':
                     data[field] = [cred.id for cred in obj.credentials.all()]
                 else:
@@ -2381,7 +2376,7 @@ class JobTemplateLaunch(RetrieveAPIView):
         """
         modern_data = data.copy()
 
-        id_fd = '{}_id'.format('inventory')
+        id_fd = 'inventory_id'
         if 'inventory' not in modern_data and id_fd in modern_data:
             modern_data['inventory'] = modern_data[id_fd]
 
@@ -2408,13 +2403,7 @@ class JobTemplateLaunch(RetrieveAPIView):
 
         passwords = serializer.validated_data.pop('credential_passwords', {})
         new_job = obj.create_unified_job(**serializer.validated_data)
-        result = new_job.signal_start(**passwords)
-
-        if not result:
-            data = dict(passwords_needed_to_start=new_job.passwords_needed_to_start)
-            new_job.delete()
-            return Response(data, status=status.HTTP_400_BAD_REQUEST)
-        else:
+        if result := new_job.signal_start(**passwords):
             data = OrderedDict()
             if isinstance(new_job, models.WorkflowJob):
                 data['workflow_job'] = new_job.id
@@ -2426,6 +2415,10 @@ class JobTemplateLaunch(RetrieveAPIView):
                 data.update(serializers.JobSerializer(new_job, context=self.get_serializer_context()).to_representation(new_job))
             headers = {'Location': new_job.get_absolute_url(request)}
             return Response(data, status=status.HTTP_201_CREATED, headers=headers)
+        else:
+            data = dict(passwords_needed_to_start=new_job.passwords_needed_to_start)
+            new_job.delete()
+            return Response(data, status=status.HTTP_400_BAD_REQUEST)
 
     def sanitize_for_response(self, data):
         """
@@ -2434,10 +2427,7 @@ class JobTemplateLaunch(RetrieveAPIView):
         """
 
         def display_value(val):
-            if hasattr(val, 'id'):
-                return val.id
-            else:
-                return val
+            return val.id if hasattr(val, 'id') else val
 
         sanitized_data = {}
         for field_name, value in data.items():
@@ -2479,8 +2469,7 @@ class JobTemplateSurveySpec(GenericAPIView):
 
         if not request.user.can_access(self.model, 'change', obj, None):
             raise PermissionDenied()
-        response = self._validate_spec_data(request.data, obj.survey_spec)
-        if response:
+        if response := self._validate_spec_data(request.data, obj.survey_spec):
             return response
         obj.survey_spec = request.data
         obj.save(update_fields=['survey_spec'])

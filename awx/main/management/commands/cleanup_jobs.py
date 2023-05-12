@@ -45,9 +45,8 @@ def partition_name_dt(part_name):
     m = p.match(part_name)
     if not m:
         return m
-    dt_str = f"{m.group(3)}_{m.group(4)}"
-    dt = datetime.datetime.strptime(dt_str, '%Y%m%d_%H').replace(tzinfo=pytz.UTC)
-    return dt
+    dt_str = f"{m[3]}_{m[4]}"
+    return datetime.datetime.strptime(dt_str, '%Y%m%d_%H').replace(tzinfo=pytz.UTC)
 
 
 def dt_to_partition_name(tbl_name, dt):
@@ -94,7 +93,7 @@ class DeleteMeta:
         # Note that parts_no_drop _may_ contain the names of partitions that don't exist
         # This can happen when the cleanup of _unpartitioned_* logic leaves behind jobs with status pending, waiting, running. The find_jobs_to_delete() will
         # pick these jobs up.
-        self.parts_no_drop = set([k for k, v in part_drop.items() if v is False])
+        self.parts_no_drop = {k for k, v in part_drop.items() if v is False}
 
     def delete_jobs(self):
         if not self.dry_run:
@@ -116,15 +115,16 @@ class DeleteMeta:
         partitions_dt = [p for p in partitions_dt if not None]
 
         # convert datetime partition back to string partition
-        partitions_maybe_drop = set([dt_to_partition_name(tbl_name, dt) for dt in partitions_dt])
+        partitions_maybe_drop = {
+            dt_to_partition_name(tbl_name, dt) for dt in partitions_dt
+        }
 
         # Do not drop partition if there is a job that will not be deleted pointing at it
         self.parts_to_drop = partitions_maybe_drop - self.parts_no_drop
 
     def drop_partitions(self):
         if len(self.parts_to_drop) > 0:
-            parts_to_drop = list(self.parts_to_drop)
-            parts_to_drop.sort()  # sort it to make reading it easier for humans
+            parts_to_drop = sorted(self.parts_to_drop)
             parts_to_drop_str = ','.join(parts_to_drop)
             if self.dry_run:
                 self.logger.debug(f"Would drop event partition(s) {parts_to_drop_str}")
@@ -210,7 +210,7 @@ class Command(BaseCommand):
             # get queryset for available jobs to remove
             qs = Job.objects.filter(created__lt=self.cutoff).exclude(status__in=['pending', 'waiting', 'running'])
             # get pk list for the first N (batch_size) objects
-            pk_list = qs[0:batch_size].values_list('pk', flat=True)
+            pk_list = qs[:batch_size].values_list('pk', flat=True)
             # You cannot delete queries with sql LIMIT set, so we must
             # create a new query from this pk_list
             qs_batch = Job.objects.filter(pk__in=pk_list)
@@ -264,7 +264,7 @@ class Command(BaseCommand):
         project_updates = ProjectUpdate.objects.filter(created__lt=self.cutoff)
         pk_list = []
         for pu in project_updates.iterator():
-            pu_display = '"%s" (type %s)' % (str(pu), str(pu.launch_type))
+            pu_display = f'"{str(pu)}" (type {str(pu.launch_type)})'
             if pu.status in ('pending', 'waiting', 'running'):
                 action_text = 'would skip' if self.dry_run else 'skipping'
                 self.logger.debug('%s %s project update %s', action_text, pu.status, pu_display)
@@ -292,7 +292,7 @@ class Command(BaseCommand):
         inventory_updates = InventoryUpdate.objects.filter(created__lt=self.cutoff)
         pk_list = []
         for iu in inventory_updates.iterator():
-            iu_display = '"%s" (source %s)' % (str(iu), str(iu.source))
+            iu_display = f'"{str(iu)}" (source {str(iu.source)})'
             if iu.status in ('pending', 'waiting', 'running'):
                 action_text = 'would skip' if self.dry_run else 'skipping'
                 self.logger.debug('%s %s inventory update %s', action_text, iu.status, iu_display)
@@ -320,7 +320,7 @@ class Command(BaseCommand):
         system_jobs = SystemJob.objects.filter(created__lt=self.cutoff)
         pk_list = []
         for sj in system_jobs.iterator():
-            sj_display = '"%s" (type %s)' % (str(sj), str(sj.job_type))
+            sj_display = f'"{str(sj)}" (type {str(sj.job_type)})'
             if sj.status in ('pending', 'waiting', 'running'):
                 action_text = 'would skip' if self.dry_run else 'skipping'
                 self.logger.debug('%s %s system_job %s', action_text, sj.status, sj_display)
@@ -352,7 +352,7 @@ class Command(BaseCommand):
         skipped, deleted = 0, 0
         workflow_jobs = WorkflowJob.objects.filter(created__lt=self.cutoff)
         for workflow_job in workflow_jobs.iterator():
-            workflow_job_display = '"{}" ({} nodes)'.format(str(workflow_job), workflow_job.workflow_nodes.count())
+            workflow_job_display = f'"{str(workflow_job)}" ({workflow_job.workflow_nodes.count()} nodes)'
             if workflow_job.status in ('pending', 'waiting', 'running'):
                 action_text = 'would skip' if self.dry_run else 'skipping'
                 self.logger.debug('%s %s job %s', action_text, workflow_job.status, workflow_job_display)
@@ -371,9 +371,7 @@ class Command(BaseCommand):
         skipped, deleted = 0, 0
         notifications = Notification.objects.filter(created__lt=self.cutoff)
         for notification in notifications.iterator():
-            notification_display = '"{}" (started {}, {} type, {} sent)'.format(
-                str(notification), str(notification.created), notification.notification_type, notification.notifications_sent
-            )
+            notification_display = f'"{str(notification)}" (started {str(notification.created)}, {notification.notification_type} type, {notification.notifications_sent} sent)'
             if notification.status in ('pending',):
                 action_text = 'would skip' if self.dry_run else 'skipping'
                 self.logger.debug('%s %s notification %s', action_text, notification.status, notification_display)
@@ -399,19 +397,15 @@ class Command(BaseCommand):
         except OverflowError:
             raise CommandError('--days specified is too large. Try something less than 99999 (about 270 years).')
         model_names = ('jobs', 'ad_hoc_commands', 'project_updates', 'inventory_updates', 'management_jobs', 'workflow_jobs', 'notifications')
-        models_to_cleanup = set()
-        for m in model_names:
-            if options.get('only_%s' % m, False):
-                models_to_cleanup.add(m)
+        models_to_cleanup = {m for m in model_names if options.get(f'only_{m}', False)}
         if not models_to_cleanup:
             models_to_cleanup.update(model_names)
-        with disable_activity_stream(), disable_computed_fields():
+        with (disable_activity_stream(), disable_computed_fields()):
             for m in model_names:
                 if m in models_to_cleanup:
-                    skipped, deleted = getattr(self, 'cleanup_%s' % m)()
+                    skipped, deleted = getattr(self, f'cleanup_{m}')()
 
-                    func = getattr(self, 'cleanup_%s_partition' % m, None)
-                    if func:
+                    if func := getattr(self, f'cleanup_{m}_partition', None):
                         skipped_partition, deleted_partition = func()
                         skipped += skipped_partition
                         deleted += deleted_partition

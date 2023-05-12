@@ -114,7 +114,7 @@ class WebhookReceiverBase(APIView):
         # Ensure that the full contents of the request are captured for multiple uses.
         request.body
 
-        logger.debug("headers: {}\n" "data: {}\n".format(request.headers, request.data))
+        logger.debug(f"headers: {request.headers}\ndata: {request.data}\n")
         obj = self.get_object()
         self.check_signature(obj)
 
@@ -183,7 +183,9 @@ class GithubWebhookReceiver(WebhookReceiverBase):
             raise PermissionDenied
         hash_alg, signature = header_sig.split('=')
         if hash_alg != 'sha1':
-            logger.debug("Unsupported signature type, expected: sha1, received: {}".format(hash_alg))
+            logger.debug(
+                f"Unsupported signature type, expected: sha1, received: {hash_alg}"
+            )
             raise PermissionDenied
         return force_bytes(signature)
 
@@ -211,7 +213,7 @@ class GitlabWebhookReceiver(WebhookReceiverBase):
             return
         parsed = urllib.parse.urlparse(repo_url)
 
-        return "{}://{}/api/v4/projects/{}/statuses/{}".format(parsed.scheme, parsed.netloc, project['id'], self.get_event_ref())
+        return f"{parsed.scheme}://{parsed.netloc}/api/v4/projects/{project['id']}/statuses/{self.get_event_ref()}"
 
     def get_signature(self):
         return force_bytes(self.request.META.get('HTTP_X_GITLAB_TOKEN') or '')

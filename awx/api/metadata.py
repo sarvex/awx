@@ -101,7 +101,7 @@ class Metadata(metadata.SimpleMetadata):
             if type(default) is UUID:
                 default = 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
             if field.field_name == 'TOWER_URL_BASE' and default == 'https://towerhost':
-                default = '{}://{}'.format(self.request.scheme, self.request.get_host())
+                default = f'{self.request.scheme}://{self.request.get_host()}'
             field_info['default'] = default
         except serializers.SkipField:
             pass
@@ -112,8 +112,8 @@ class Metadata(metadata.SimpleMetadata):
             field_info['children'] = self.get_serializer_info(field)
 
         if not isinstance(field, (RelatedField, ManyRelatedField)) and hasattr(field, 'choices'):
-            choices = [(choice_value, choice_name) for choice_value, choice_name in field.choices.items()]
-            if not any(choice in ('', None) for choice, _ in choices):
+            choices = list(field.choices.items())
+            if all(choice not in ('', None) for choice, _ in choices):
                 if field.allow_blank:
                     choices = [("", "---------")] + choices
                 if field.allow_null and not isinstance(field, ChoiceNullField):
@@ -233,9 +233,9 @@ class Metadata(metadata.SimpleMetadata):
                     # show it (file-based read-only settings can't be updated)
                     meta.pop('defined_in_file', False)
 
-                    if meta.pop('read_only', False):
-                        if field == 'id' and hasattr(view, 'attach'):
-                            continue
+                    if meta.pop('read_only', False) and (
+                        field != 'id' or not hasattr(view, 'attach')
+                    ):
                         actions[method].pop(field)
 
         return actions
@@ -267,12 +267,13 @@ class Metadata(metadata.SimpleMetadata):
 
         # include role names in metadata
         roles = []
-        model = getattr(view, 'model', None)
-        if model:
-            for field in model._meta.get_fields():
-                if type(field) is ImplicitRoleField:
-                    roles.append(field.name)
-        if len(roles) > 0:
+        if model := getattr(view, 'model', None):
+            roles.extend(
+                field.name
+                for field in model._meta.get_fields()
+                if type(field) is ImplicitRoleField
+            )
+        if roles:
             metadata['object_roles'] = roles
 
         from rest_framework import generics

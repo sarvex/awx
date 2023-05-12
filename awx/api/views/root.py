@@ -147,9 +147,14 @@ class ApiV2PingView(APIView):
         Everything returned here should be considered public / insecure, as
         this requires no auth and is intended for use by the installer process.
         """
-        response = {'ha': is_ha_environment(), 'version': get_awx_version(), 'active_node': settings.CLUSTER_HOST_ID, 'install_uuid': settings.INSTALL_UUID}
+        response = {
+            'ha': is_ha_environment(),
+            'version': get_awx_version(),
+            'active_node': settings.CLUSTER_HOST_ID,
+            'install_uuid': settings.INSTALL_UUID,
+            'instances': [],
+        }
 
-        response['instances'] = []
         for instance in Instance.objects.exclude(node_type='hop'):
             response['instances'].append(
                 dict(
@@ -229,7 +234,7 @@ class ApiV2AttachView(APIView):
             return Response({"error": _("No subscription pool ID provided.")}, status=status.HTTP_400_BAD_REQUEST)
         user = getattr(settings, 'SUBSCRIPTIONS_USERNAME', None)
         pw = getattr(settings, 'SUBSCRIPTIONS_PASSWORD', None)
-        if pool_id and user and pw:
+        if user and pw:
 
             data = request.data.copy()
             try:
@@ -304,12 +309,10 @@ class ApiV2ConfigView(APIView):
             or Organization.accessible_objects(request.user, 'auditor_role').exists()
             or Organization.accessible_objects(request.user, 'project_admin_role').exists()
         ):
-            data.update(
-                dict(
-                    project_base_dir=settings.PROJECTS_ROOT,
-                    project_local_paths=Project.get_local_path_choices(),
-                    custom_virtualenvs=get_custom_venv_choices(),
-                )
+            data |= dict(
+                project_base_dir=settings.PROJECTS_ROOT,
+                project_local_paths=Project.get_local_path_choices(),
+                custom_virtualenvs=get_custom_venv_choices(),
             )
         elif JobTemplate.accessible_objects(request.user, 'admin_role').exists():
             data['custom_virtualenvs'] = get_custom_venv_choices()
@@ -354,7 +357,7 @@ class ApiV2ConfigView(APIView):
         # If the license is valid, write it to the database.
         if license_data_validated['valid_key']:
             if not settings_registry.is_setting_read_only('TOWER_URL_BASE'):
-                settings.TOWER_URL_BASE = "{}://{}".format(request.scheme, request.get_host())
+                settings.TOWER_URL_BASE = f"{request.scheme}://{request.get_host()}"
             return Response(license_data_validated)
 
         logger.warning(smart_text(u"Invalid subscription submitted."), extra=dict(actor=request.user.username))

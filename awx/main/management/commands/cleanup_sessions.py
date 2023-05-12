@@ -20,4 +20,6 @@ class Command(BaseCommand):
         self.init_logging()
         total_sessions = Session.objects.all().count()
         management.call_command('clearsessions')
-        self.logger.info("Expired Sessions deleted {}".format(total_sessions - Session.objects.all().count()))
+        self.logger.info(
+            f"Expired Sessions deleted {total_sessions - Session.objects.all().count()}"
+        )

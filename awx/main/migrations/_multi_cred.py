@@ -40,20 +40,16 @@ def migrate_back_from_multi_cred(app, schema_editor):
             for cred in j.credentials.iterator():
                 changed = False
                 if cred.credential_type_id == vault_credtype.id:
-                    changed = True
-                    ct += 1
                     logger.debug('Reverse migrating vault cred %s for %s %s', cred.id, cls, j.id)
                     j.vault_credential = cred
                 elif cred.credential_type_id == ssh_credtype.id:
-                    changed = True
-                    ct += 1
                     logger.debug('Reverse migrating ssh cred %s for %s %s', cred.id, cls, j.id)
                     j.credential = cred
                 else:
-                    changed = True
-                    ct += 1
                     logger.debug('Reverse migrating cloud cred %s for %s %s', cred.id, cls, j.id)
                     j.extra_credentials.add(cred)
+                ct += 1
+                changed = True
                 if changed:
                     j.save()
     if ct:
@@ -82,8 +78,7 @@ def migrate_workflow_cred_reverse(app, schema_editor):
     ct = 0
     for cls in (WorkflowJobNode, WorkflowJobTemplateNode):
         for node in cls.objects.iterator():
-            cred = node.credentials.first()
-            if cred:
+            if cred := node.credentials.first():
                 node.credential = cred
                 logger.debug('Reverse migrating prompted credential %s for %s %s', node.credential_id, cls, node.id)
                 ct += 1
@@ -114,8 +109,7 @@ def migrate_inventory_source_cred_reverse(app, schema_editor):
     ct = 0
     for cls in (InventoryUpdate, InventorySource):
         for obj in cls.objects.iterator():
-            cred = obj.credentials.first()
-            if cred:
+            if cred := obj.credentials.first():
                 ct += 1
                 logger.debug('Reverse migrating credential %s for %s %s', cred.id, cls, obj.id)
                 obj.credential = cred

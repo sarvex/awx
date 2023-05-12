@@ -36,11 +36,11 @@ class SettingsRegistry(object):
 
     def register(self, setting, **kwargs):
         if setting in self._registry:
-            raise ImproperlyConfigured('Setting "{}" is already registered.'.format(setting))
+            raise ImproperlyConfigured(f'Setting "{setting}" is already registered.')
         category = kwargs.setdefault('category', None)
         category_slug = kwargs.setdefault('category_slug', slugify(category or '') or None)
         if category_slug in {'all', 'changed', 'user-defaults'}:
-            raise ImproperlyConfigured('"{}" is a reserved category slug.'.format(category_slug))
+            raise ImproperlyConfigured(f'"{category_slug}" is a reserved category slug.')
         if 'field_class' not in kwargs:
             raise ImproperlyConfigured('Setting must provide a field_class keyword argument.')
         self._registry[setting] = kwargs
@@ -115,7 +115,7 @@ class SettingsRegistry(object):
         from rest_framework.fields import empty
 
         field_kwargs = {}
-        field_kwargs.update(self._registry[setting])
+        field_kwargs |= self._registry[setting]
         field_kwargs.update(kwargs)
         field_class = original_field_class = field_kwargs.pop('field_class')
         if mixin_class:

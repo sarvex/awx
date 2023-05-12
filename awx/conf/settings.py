@@ -83,14 +83,17 @@ def _ctit_db_wrapper(trans_safe=False):
         if trans_safe:
             if 'migrate' not in sys.argv and 'check_migrations' not in sys.argv:
                 level = logger.exception
-                if isinstance(exc, ProgrammingError):
-                    if 'relation' in str(exc) and 'does not exist' in str(exc):
-                        # this generally means we can't fetch Tower configuration
-                        # because the database hasn't actually finished migrating yet;
-                        # this is usually a sign that a service in a container (such as ws_broadcast)
-                        # has come up *before* the database has finished migrating, and
-                        # especially that the conf.settings table doesn't exist yet
-                        level = logger.debug
+                if (
+                    isinstance(exc, ProgrammingError)
+                    and 'relation' in str(exc)
+                    and 'does not exist' in str(exc)
+                ):
+                    # this generally means we can't fetch Tower configuration
+                    # because the database hasn't actually finished migrating yet;
+                    # this is usually a sign that a service in a container (such as ws_broadcast)
+                    # has come up *before* the database has finished migrating, and
+                    # especially that the conf.settings table doesn't exist yet
+                    level = logger.debug
                 level('Database settings are not available, using defaults.')
         else:
             logger.exception('Error modifying something related to database settings.')
@@ -100,9 +103,7 @@ def _ctit_db_wrapper(trans_safe=False):
 
 
 def filter_sensitive(registry, key, value):
-    if registry.is_setting_encrypted(key):
-        return '$encrypted$'
-    return value
+    return '$encrypted$' if registry.is_setting_encrypted(key) else value
 
 
 class TransientSetting(object):
@@ -148,7 +149,10 @@ class EncryptedCacheProxy(object):
         self.cache.set(key, self._handle_encryption(self.encrypter, key, value), **kwargs)
 
     def set_many(self, data, **kwargs):
-        filtered_data = dict((key, filter_sensitive(self.registry, key, value)) for key, value in data.items())
+        filtered_data = {
+            key: filter_sensitive(self.registry, key, value)
+            for key, value in data.items()
+        }
         logger.debug('cache set_many(%r, %r)', filtered_data, SETTING_CACHE_TIMEOUT)
         for key, value in data.items():
             self.set(key, value, log=False, **kwargs)
@@ -308,13 +312,11 @@ class SettingsWrapper(UserSettingsHolder):
                 if value != SETTING_CACHE_NOTSET:
                     continue
                 field = self.registry.get_setting_field(key)
-                try:
+                with contextlib.suppress(SkipField):
                     settings_to_cache[key] = get_cache_value(field.get_default())
                     if self.registry.is_setting_encrypted(key):
                         # No database pk, so None will be passed to encryption algorithm
                         setting_ids[key] = SETTING_CACHE_NOTSET
-                except SkipField:
-                    pass
         # Generate a cache key for each setting and store them all at once.
         settings_to_cache = dict([(Setting.get_cache_key(k), v) for k, v in settings_to_cache.items()])
         for k, id_val in setting_ids.items():
@@ -356,12 +358,10 @@ class SettingsWrapper(UserSettingsHolder):
             else:
                 value = SETTING_CACHE_NOTSET
                 if SETTING_CACHE_DEFAULTS:
-                    try:
+                    with contextlib.suppress(SkipField):
                         value = field.get_default()
                         if getattr(field, 'encrypted', False):
                             setting_id = SETTING_CACHE_NONE
-                    except SkipField:
-                        pass
             # If None implies not set, convert when reading the value.
             if value is None and SETTING_CACHE_NOTSET == SETTING_CACHE_NONE:
                 value = SETTING_CACHE_NOTSET
@@ -371,21 +371,15 @@ class SettingsWrapper(UserSettingsHolder):
                     self.cache.cache.set(Setting.get_cache_id_key(cache_key), setting_id)
                 self.cache.set(cache_key, get_cache_value(value), timeout=SETTING_CACHE_TIMEOUT)
         if value == SETTING_CACHE_NOTSET and not SETTING_CACHE_DEFAULTS:
-            try:
+            with contextlib.suppress(SkipField):
                 value = field.get_default()
-            except SkipField:
-                pass
         if value not in (empty, SETTING_CACHE_NOTSET):
             try:
-                if field.read_only:
-                    internal_value = field.to_internal_value(value)
-                    field.run_validators(internal_value)
-                    return internal_value
-                else:
-                    if validate:
-                        return field.run_validation(value)
-                    else:
-                        return value
+                if not field.read_only:
+                    return field.run_validation(value) if validate else value
+                internal_value = field.to_internal_value(value)
+                field.run_validators(internal_value)
+                return internal_value
             except Exception:
                 logger.warning('The current value "%r" for setting "%s" is invalid.', value, name, exc_info=True)
         return empty
@@ -403,15 +397,13 @@ class SettingsWrapper(UserSettingsHolder):
         if name in self.all_supported_settings:
             with _ctit_db_wrapper(trans_safe=True):
                 value = self._get_local(name)
-        if value is not empty:
-            return value
-        return self._get_default(name)
+        return value if value is not empty else self._get_default(name)
 
     def _set_local(self, name, value):
         field = self.registry.get_setting_field(name)
         if field.read_only:
             logger.warning('Attempt to set read only setting "%s".', name)
-            raise ImproperlyConfigured('Setting "{}" is read only.'.format(name))
+            raise ImproperlyConfigured(f'Setting "{name}" is read only.')
 
         try:
             data = None if value is None and isinstance(field, PrimaryKeyRelatedField) else field.to_representation(value)
@@ -441,7 +433,7 @@ class SettingsWrapper(UserSettingsHolder):
         field = self.registry.get_setting_field(name)
         if field.read_only:
             logger.warning('Attempt to delete read only setting "%s".', name)
-            raise ImproperlyConfigured('Setting "{}" is read only.'.format(name))
+            raise ImproperlyConfigured(f'Setting "{name}" is read only.')
         for setting in Setting.objects.filter(key=name, user__isnull=True):
             setting.delete()
             # pre_delete handler will delete from cache.

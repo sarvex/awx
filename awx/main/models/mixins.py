@@ -115,18 +115,22 @@ class SurveyJobTemplateMixin(models.Model):
         vars = []
         if self.survey_enabled and 'spec' in self.survey_spec:
             # Get variables that are type password
-            for survey_element in self.survey_spec['spec']:
-                if survey_element['type'] == 'password':
-                    vars.append(survey_element['variable'])
+            vars.extend(
+                survey_element['variable']
+                for survey_element in self.survey_spec['spec']
+                if survey_element['type'] == 'password'
+            )
         return vars
 
     @property
     def variables_needed_to_start(self):
         vars = []
         if self.survey_enabled and 'spec' in self.survey_spec:
-            for survey_element in self.survey_spec['spec']:
-                if survey_element['required']:
-                    vars.append(survey_element['variable'])
+            vars.extend(
+                survey_element['variable']
+                for survey_element in self.survey_spec['spec']
+                if survey_element['required']
+            )
         return vars
 
     def _update_unified_job_kwargs(self, create_kwargs, kwargs):
@@ -159,11 +163,13 @@ class SurveyJobTemplateMixin(models.Model):
                 default = survey_element.get('default')
                 variable_key = survey_element.get('variable')
 
-                if survey_element.get('type') == 'password':
-                    if variable_key in runtime_extra_vars:
-                        kw_value = runtime_extra_vars[variable_key]
-                        if kw_value == '$encrypted$':
-                            runtime_extra_vars.pop(variable_key)
+                if (
+                    survey_element.get('type') == 'password'
+                    and variable_key in runtime_extra_vars
+                ):
+                    kw_value = runtime_extra_vars[variable_key]
+                    if kw_value == '$encrypted$':
+                        runtime_extra_vars.pop(variable_key)
 
                 if default is not None:
                     decrypted_default = default
@@ -188,89 +194,100 @@ class SurveyJobTemplateMixin(models.Model):
         if survey_element['type'] == "password":
             password_value = data.get(survey_element['variable'])
             if isinstance(password_value, str) and password_value == '$encrypted$':
-                if survey_element.get('default') is None and survey_element['required']:
-                    if validate_required:
-                        errors.append("'%s' value missing" % survey_element['variable'])
+                if (
+                    survey_element.get('default') is None
+                    and survey_element['required']
+                    and validate_required
+                ):
+                    errors.append(f"'{survey_element['variable']}' value missing")
                 return errors
 
         if survey_element['variable'] not in data and survey_element['required']:
             if validate_required:
-                errors.append("'%s' value missing" % survey_element['variable'])
+                errors.append(f"'{survey_element['variable']}' value missing")
         elif survey_element['type'] in ["textarea", "text", "password"]:
             if survey_element['variable'] in data:
                 if not isinstance(data[survey_element['variable']], str):
-                    errors.append("Value %s for '%s' expected to be a string." % (data[survey_element['variable']], survey_element['variable']))
+                    errors.append(
+                        f"Value {data[survey_element['variable']]} for '{survey_element['variable']}' expected to be a string."
+                    )
                     return errors
 
                 if 'min' in survey_element and survey_element['min'] not in ["", None] and len(data[survey_element['variable']]) < int(survey_element['min']):
                     errors.append(
-                        "'%s' value %s is too small (length is %s must be at least %s)."
-                        % (survey_element['variable'], data[survey_element['variable']], len(data[survey_element['variable']]), survey_element['min'])
+                        f"'{survey_element['variable']}' value {data[survey_element['variable']]} is too small (length is {len(data[survey_element['variable']])} must be at least {survey_element['min']})."
                     )
                 if 'max' in survey_element and survey_element['max'] not in ["", None] and len(data[survey_element['variable']]) > int(survey_element['max']):
                     errors.append(
-                        "'%s' value %s is too large (must be no more than %s)."
-                        % (survey_element['variable'], data[survey_element['variable']], survey_element['max'])
+                        f"'{survey_element['variable']}' value {data[survey_element['variable']]} is too large (must be no more than {survey_element['max']})."
                     )
 
         elif survey_element['type'] == 'integer':
             if survey_element['variable'] in data:
                 if type(data[survey_element['variable']]) != int:
-                    errors.append("Value %s for '%s' expected to be an integer." % (data[survey_element['variable']], survey_element['variable']))
+                    errors.append(
+                        f"Value {data[survey_element['variable']]} for '{survey_element['variable']}' expected to be an integer."
+                    )
                     return errors
                 if (
                     'min' in survey_element
                     and survey_element['min'] not in ["", None]
-                    and survey_element['variable'] in data
-                    and data[survey_element['variable']] < int(survey_element['min'])
+                    and data[survey_element['variable']]
+                    < int(survey_element['min'])
                 ):
                     errors.append(
-                        "'%s' value %s is too small (must be at least %s)."
-                        % (survey_element['variable'], data[survey_element['variable']], survey_element['min'])
+                        f"'{survey_element['variable']}' value {data[survey_element['variable']]} is too small (must be at least {survey_element['min']})."
                     )
                 if (
                     'max' in survey_element
                     and survey_element['max'] not in ["", None]
-                    and survey_element['variable'] in data
-                    and data[survey_element['variable']] > int(survey_element['max'])
+                    and data[survey_element['variable']]
+                    > int(survey_element['max'])
                 ):
                     errors.append(
-                        "'%s' value %s is too large (must be no more than %s)."
-                        % (survey_element['variable'], data[survey_element['variable']], survey_element['max'])
+                        f"'{survey_element['variable']}' value {data[survey_element['variable']]} is too large (must be no more than {survey_element['max']})."
                     )
         elif survey_element['type'] == 'float':
             if survey_element['variable'] in data:
                 if type(data[survey_element['variable']]) not in (float, int):
-                    errors.append("Value %s for '%s' expected to be a numeric type." % (data[survey_element['variable']], survey_element['variable']))
+                    errors.append(
+                        f"Value {data[survey_element['variable']]} for '{survey_element['variable']}' expected to be a numeric type."
+                    )
                     return errors
                 if 'min' in survey_element and survey_element['min'] not in ["", None] and data[survey_element['variable']] < float(survey_element['min']):
                     errors.append(
-                        "'%s' value %s is too small (must be at least %s)."
-                        % (survey_element['variable'], data[survey_element['variable']], survey_element['min'])
+                        f"'{survey_element['variable']}' value {data[survey_element['variable']]} is too small (must be at least {survey_element['min']})."
                     )
                 if 'max' in survey_element and survey_element['max'] not in ["", None] and data[survey_element['variable']] > float(survey_element['max']):
                     errors.append(
-                        "'%s' value %s is too large (must be no more than %s)."
-                        % (survey_element['variable'], data[survey_element['variable']], survey_element['max'])
+                        f"'{survey_element['variable']}' value {data[survey_element['variable']]} is too large (must be no more than {survey_element['max']})."
                     )
         elif survey_element['type'] == 'multiselect':
             if survey_element['variable'] in data:
                 if type(data[survey_element['variable']]) != list:
-                    errors.append("'%s' value is expected to be a list." % survey_element['variable'])
+                    errors.append(
+                        f"'{survey_element['variable']}' value is expected to be a list."
+                    )
                 else:
                     choice_list = copy(survey_element['choices'])
                     if isinstance(choice_list, str):
                         choice_list = [choice for choice in choice_list.splitlines() if choice.strip() != '']
-                    for val in data[survey_element['variable']]:
-                        if val not in choice_list:
-                            errors.append("Value %s for '%s' expected to be one of %s." % (val, survey_element['variable'], choice_list))
+                    errors.extend(
+                        f"Value {val} for '{survey_element['variable']}' expected to be one of {choice_list}."
+                        for val in data[survey_element['variable']]
+                        if val not in choice_list
+                    )
         elif survey_element['type'] == 'multiplechoice':
             choice_list = copy(survey_element['choices'])
             if isinstance(choice_list, str):
                 choice_list = [choice for choice in choice_list.splitlines() if choice.strip() != '']
-            if survey_element['variable'] in data:
-                if data[survey_element['variable']] not in choice_list:
-                    errors.append("Value %s for '%s' expected to be one of %s." % (data[survey_element['variable']], survey_element['variable'], choice_list))
+            if (
+                survey_element['variable'] in data
+                and data[survey_element['variable']] not in choice_list
+            ):
+                errors.append(
+                    f"Value {data[survey_element['variable']]} for '{survey_element['variable']}' expected to be one of {choice_list}."
+                )
         return errors
 
     def _accept_or_ignore_variables(self, data, errors=None, _exclude_errors=(), extra_passwords=None):
@@ -306,7 +323,7 @@ class SurveyJobTemplateMixin(models.Model):
 
         if self.ask_variables_on_launch:
             # We can accept all variables
-            accepted.update(extra_vars)
+            accepted |= extra_vars
             extra_vars = {}
 
         if extra_vars:
@@ -318,7 +335,7 @@ class SurveyJobTemplateMixin(models.Model):
 
         if extra_vars:
             # Leftover extra_vars, keys provided that are not allowed
-            rejected.update(extra_vars)
+            rejected |= extra_vars
             # ignored variables does not block manual launch
             if 'prompts' not in _exclude_errors:
                 errors['extra_vars'] = [
@@ -335,11 +352,11 @@ class SurveyJobTemplateMixin(models.Model):
         """
         Utility method that will return a dictionary keyed off variable names
         """
-        pivoted = {}
-        for element_data in spec.get('spec', []):
-            if 'variable' in element_data:
-                pivoted[element_data['variable']] = element_data
-        return pivoted
+        return {
+            element_data['variable']: element_data
+            for element_data in spec.get('spec', [])
+            if 'variable' in element_data
+        }
 
     def survey_variable_validation(self, data):
         errors = []
@@ -359,9 +376,12 @@ class SurveyJobTemplateMixin(models.Model):
         """
         survey_spec = deepcopy(self.survey_spec) if self.survey_spec else {}
         for field in survey_spec.get('spec', []):
-            if field.get('type') == 'password':
-                if 'default' in field and field['default']:
-                    field['default'] = '$encrypted$'
+            if (
+                field.get('type') == 'password'
+                and 'default' in field
+                and field['default']
+            ):
+                field['default'] = '$encrypted$'
         return survey_spec
 
 
@@ -381,28 +401,26 @@ class SurveyJobMixin(models.Model):
         """
         Hides fields marked as passwords in survey.
         """
-        if self.survey_passwords:
-            extra_vars = json.loads(self.extra_vars)
-            for key, value in self.survey_passwords.items():
-                if key in extra_vars:
-                    extra_vars[key] = value
-            return json.dumps(extra_vars)
-        else:
+        if not self.survey_passwords:
             return self.extra_vars
+        extra_vars = json.loads(self.extra_vars)
+        for key, value in self.survey_passwords.items():
+            if key in extra_vars:
+                extra_vars[key] = value
+        return json.dumps(extra_vars)
 
     def decrypted_extra_vars(self):
         """
         Decrypts fields marked as passwords in survey.
         """
-        if self.survey_passwords:
-            extra_vars = json.loads(self.extra_vars)
-            for key in self.survey_passwords:
-                value = extra_vars.get(key)
-                if value and isinstance(value, str) and value.startswith('$encrypted$'):
-                    extra_vars[key] = decrypt_value(get_encryption_key('value', pk=None), value)
-            return json.dumps(extra_vars)
-        else:
+        if not self.survey_passwords:
             return self.extra_vars
+        extra_vars = json.loads(self.extra_vars)
+        for key in self.survey_passwords:
+            value = extra_vars.get(key)
+            if value and isinstance(value, str) and value.startswith('$encrypted$'):
+                extra_vars[key] = decrypt_value(get_encryption_key('value', pk=None), value)
+        return json.dumps(extra_vars)
 
 
 class TaskManagerUnifiedJobMixin(models.Model):
@@ -424,10 +442,10 @@ class TaskManagerJobMixin(TaskManagerUnifiedJobMixin):
         return [self.project_update] if self.project_update else []
 
     def dependent_jobs_finished(self):
-        for j in self.dependent_jobs.all():
-            if j.status in ['pending', 'waiting', 'running']:
-                return False
-        return True
+        return all(
+            j.status not in ['pending', 'waiting', 'running']
+            for j in self.dependent_jobs.all()
+        )
 
 
 class TaskManagerUpdateOnLaunchMixin(TaskManagerUnifiedJobMixin):
@@ -475,9 +493,12 @@ class ExecutionEnvironmentMixin(models.Model):
             return self.project.default_environment
         if getattr(self, 'organization_id', None) and self.organization.default_environment is not None:
             return self.organization.default_environment
-        if getattr(self, 'inventory_id', None) and self.inventory.organization is not None:
-            if self.inventory.organization.default_environment is not None:
-                return self.inventory.organization.default_environment
+        if (
+            getattr(self, 'inventory_id', None)
+            and self.inventory.organization is not None
+            and self.inventory.organization.default_environment is not None
+        ):
+            return self.inventory.organization.default_environment
 
         return get_default_execution_environment()
 
@@ -494,9 +515,7 @@ class CustomVirtualEnvMixin(models.Model):
         value = self.custom_virtualenv
         if value and os.path.join(value, '') not in get_custom_venv_choices():
             raise ValidationError(_('{} is not a valid virtualenv in {}').format(value, settings.BASE_VENV_PATH))
-        if value:
-            return os.path.join(value, '')
-        return None
+        return os.path.join(value, '') if value else None
 
 
 class RelatedJobsMixin(object):
@@ -616,7 +635,7 @@ class WebhookMixin(models.Model):
 
         statuses = service_statuses[self.webhook_service]
         if status not in statuses:
-            logger.debug("Skipping webhook job status change: '{}'".format(status))
+            logger.debug(f"Skipping webhook job status change: '{status}'")
             return
         try:
             license_type = get_licenser().validate().get('license_type')
@@ -635,4 +654,6 @@ class WebhookMixin(models.Model):
         if response.status_code < 400:
             logger.debug("Webhook status update sent.")
         else:
-            logger.error("Posting webhook status failed, code: {}\n" "{}\n" "Payload sent: {}".format(response.status_code, response.text, json.dumps(data)))
+            logger.error(
+                f"Posting webhook status failed, code: {response.status_code}\n{response.text}\nPayload sent: {json.dumps(data)}"
+            )

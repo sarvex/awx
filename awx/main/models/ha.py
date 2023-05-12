@@ -152,7 +152,11 @@ class Instance(HasPolicyEditsMixin, BaseModel):
             capacity_consumed += sum(x.task_impact for x in UnifiedJob.objects.filter(execution_node=self.hostname, status__in=('running', 'waiting')))
         if self.node_type in ('hybrid', 'control'):
             capacity_consumed += sum(
-                settings.AWX_CONTROL_NODE_TASK_IMPACT for x in UnifiedJob.objects.filter(controller_node=self.hostname, status__in=('running', 'waiting'))
+                settings.AWX_CONTROL_NODE_TASK_IMPACT
+                for _ in UnifiedJob.objects.filter(
+                    controller_node=self.hostname,
+                    status__in=('running', 'waiting'),
+                )
             )
         return capacity_consumed
 
@@ -186,13 +190,16 @@ class Instance(HasPolicyEditsMixin, BaseModel):
         returns a dict that is passed to the python interface for the runner method corresponding to that command
         any kwargs will override that key=value combination in the returned dict
         """
-        vargs = dict()
+        vargs = {}
         if settings.AWX_CLEANUP_PATHS:
-            vargs['file_pattern'] = '/tmp/{}*'.format(JOB_FOLDER_PREFIX % '*')
-        vargs.update(kwargs)
+            vargs['file_pattern'] = f"/tmp/{JOB_FOLDER_PREFIX % '*'}*"
+        vargs |= kwargs
         if 'exclude_strings' not in vargs and vargs.get('file_pattern'):
-            active_pks = list(UnifiedJob.objects.filter(execution_node=self.hostname, status__in=('running', 'waiting')).values_list('pk', flat=True))
-            if active_pks:
+            if active_pks := list(
+                UnifiedJob.objects.filter(
+                    execution_node=self.hostname, status__in=('running', 'waiting')
+                ).values_list('pk', flat=True)
+            ):
                 vargs['exclude_strings'] = [JOB_FOLDER_PREFIX % job_id for job_id in active_pks]
         if 'remove_images' in vargs or 'image_prune' in vargs:
             vargs.setdefault('process_isolation_executable', 'podman')
@@ -377,11 +384,10 @@ class InstanceGroup(HasPolicyEditsMixin, BaseModel, RelatedJobsMixin):
         for i in instances:
             if i.node_type not in (capacity_type, 'hybrid'):
                 continue
-            if i.jobs_running == 0:
-                if largest_instance is None:
-                    largest_instance = i
-                elif i.capacity > largest_instance.capacity:
-                    largest_instance = i
+            if i.jobs_running == 0 and (
+                largest_instance is None or i.capacity > largest_instance.capacity
+            ):
+                largest_instance = i
         return largest_instance
 
     def set_default_policy_fields(self):
@@ -405,7 +411,7 @@ def on_instance_group_saved(sender, instance, created=False, raw=False, **kwargs
     if created or instance.has_policy_changes():
         if not instance.is_container_group:
             schedule_policy_task()
-    elif created or instance.is_container_group:
+    elif instance.is_container_group:
         instance.set_default_policy_fields()
 
 

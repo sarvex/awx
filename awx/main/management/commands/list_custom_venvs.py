@@ -15,8 +15,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         super(Command, self).__init__()
-        venvs = get_custom_venv_choices()
-        if venvs:
+        if venvs := get_custom_venv_choices():
             if not options.get('q'):
                 msg = [
                     '# Discovered Virtual Environments:',
@@ -37,7 +36,5 @@ class Command(BaseCommand):
         else:
             msg = ["No custom virtual environments detected in:", settings.BASE_VENV_PATH]
 
-            for path in settings.CUSTOM_VENV_PATHS:
-                msg.append(path)
-
+            msg.extend(iter(settings.CUSTOM_VENV_PATHS))
             print('\n'.join(msg), file=sys.stderr)

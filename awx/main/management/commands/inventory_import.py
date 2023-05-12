@@ -54,9 +54,7 @@ Contact us (https://www.redhat.com/contact) for subscription information.'''
 
 
 def functioning_dir(path):
-    if os.path.isdir(path):
-        return path
-    return os.path.dirname(path)
+    return path if os.path.isdir(path) else os.path.dirname(path)
 
 
 class AnsibleInventoryLoader(object):
@@ -72,8 +70,13 @@ class AnsibleInventoryLoader(object):
         self.verbosity = verbosity
 
     def get_base_args(self):
-        bargs = ['podman', 'run', '--user=root', '--quiet']
-        bargs.extend(['-v', '{0}:{0}:Z'.format(self.source)])
+        bargs = [
+            'podman',
+            'run',
+            '--user=root',
+            '--quiet',
+            *['-v', '{0}:{0}:Z'.format(self.source)],
+        ]
         for key, value in STANDARD_INVENTORY_UPDATE_ENV.items():
             bargs.extend(['-e', '{0}={1}'.format(key, value)])
         ee = get_default_execution_environment()
@@ -98,9 +101,9 @@ class AnsibleInventoryLoader(object):
         bargs.extend(['--playbook-dir', functioning_dir(self.source)])
         if self.verbosity:
             # INFO: -vvv, DEBUG: -vvvvv, for inventory, any more than 3 makes little difference
-            bargs.append('-{}'.format('v' * min(5, self.verbosity * 2 + 1)))
+            bargs.append(f"-{'v' * min(5, self.verbosity * 2 + 1)}")
         bargs.append('--list')
-        logger.debug('Using base command: {}'.format(' '.join(bargs)))
+        logger.debug(f"Using base command: {' '.join(bargs)}")
         return bargs
 
     def command_to_json(self, cmd):
@@ -120,7 +123,9 @@ class AnsibleInventoryLoader(object):
         try:
             data = json.loads(stdout)
             if not isinstance(data, dict):
-                raise TypeError('Returned JSON must be a dictionary, got %s instead' % str(type(data)))
+                raise TypeError(
+                    f'Returned JSON must be a dictionary, got {str(type(data))} instead'
+                )
         except Exception:
             logger.error('Failed to load JSON from: %s', stdout)
             raise
@@ -247,7 +252,7 @@ class Command(BaseCommand):
             if enabled is not default:
                 enabled_value = getattr(self, 'enabled_value', None)
                 if enabled_value is not None:
-                    enabled = bool(str(enabled_value).lower() == str(enabled).lower())
+                    enabled = str(enabled_value).lower() == str(enabled).lower()
                 else:
                     enabled = bool(enabled)
         if enabled is default:
@@ -255,12 +260,12 @@ class Command(BaseCommand):
         elif isinstance(enabled, bool):
             return enabled
         else:
-            raise NotImplementedError('Value of enabled {} not understood.'.format(enabled))
+            raise NotImplementedError(f'Value of enabled {enabled} not understood.')
 
     @staticmethod
     def get_source_absolute_path(source):
         if not os.path.exists(source):
-            raise IOError('Source does not exist: %s' % source)
+            raise IOError(f'Source does not exist: {source}')
         source = os.path.join(os.getcwd(), os.path.dirname(source), os.path.basename(source))
         source = os.path.normpath(os.path.abspath(source))
         return source
@@ -288,10 +293,8 @@ class Command(BaseCommand):
             for instance_id_part in reversed(self.instance_id_var.split(',')):
                 host_qs = host_qs.filter(instance_id='', variables__contains=instance_id_part.split('.')[0])
                 for host in host_qs:
-                    instance_id = self._get_instance_id(host.variables_dict)
-                    if not instance_id:
-                        continue
-                    self.db_instance_id_map[instance_id] = host.pk
+                    if instance_id := self._get_instance_id(host.variables_dict):
+                        self.db_instance_id_map[instance_id] = host.pk
 
     def _build_mem_instance_id_map(self):
         """
@@ -664,7 +667,7 @@ class Command(BaseCommand):
             try:
                 sanitize_jinja(mem_host_name)
             except ValueError as e:
-                raise ValueError(str(e) + ': {}'.format(mem_host_name))
+                raise ValueError(f'{str(e)}: {mem_host_name}')
             db_host = self.inventory.hosts.update_or_create(name=mem_host_name, defaults=host_attrs)[0]
             if enabled is False:
                 logger.debug('Host "%s" added (disabled)', mem_host_name)
@@ -767,7 +770,9 @@ class Command(BaseCommand):
         if remote_license_type is None:
             raise PermissionDenied('Unexpected Error: Tower inventory plugin missing needed metadata!')
         if local_license_type != remote_license_type:
-            raise PermissionDenied('Tower server licenses must match: source: {} local: {}'.format(remote_license_type, local_license_type))
+            raise PermissionDenied(
+                f'Tower server licenses must match: source: {remote_license_type} local: {local_license_type}'
+            )
 
     def check_license(self):
         license_info = get_licenser().validate()
@@ -829,7 +834,7 @@ class Command(BaseCommand):
         elif not inventory_name and not inventory_id:
             raise CommandError('--inventory-name or --inventory-id is required')
 
-        with advisory_lock('inventory_{}_import'.format(inventory_id)):
+        with advisory_lock(f'inventory_{inventory_id}_import'):
             # Obtain rest of the options needed to run update
             raw_source = options.get('source', None)
             if not raw_source:
@@ -838,10 +843,7 @@ class Command(BaseCommand):
             self.set_logging_level(verbosity)
 
             # Load inventory object based on name or ID.
-            if inventory_id:
-                q = dict(id=inventory_id)
-            else:
-                q = dict(name=inventory_name)
+            q = dict(id=inventory_id) if inventory_id else dict(name=inventory_name)
             try:
                 inventory = Inventory.objects.get(**q)
             except Inventory.DoesNotExist:
@@ -862,7 +864,11 @@ class Command(BaseCommand):
                     overwrite_vars=bool(options.get('overwrite_vars', False)),
                 )
                 inventory_update = inventory_source.create_inventory_update(
-                    _eager_fields=dict(job_args=json.dumps(sys.argv), job_env=dict(os.environ.items()), job_cwd=os.getcwd())
+                    _eager_fields=dict(
+                        job_args=json.dumps(sys.argv),
+                        job_env=dict(os.environ),
+                        job_cwd=os.getcwd(),
+                    )
                 )
 
             data = AnsibleInventoryLoader(source=source, verbosity=verbosity).load()
@@ -875,7 +881,7 @@ class Command(BaseCommand):
                 status = 'successful'
             except Exception as e:
                 exc = e
-                if isinstance(e, KeyboardInterrupt):
+                if isinstance(exc, KeyboardInterrupt):
                     status = 'canceled'
                 else:
                     tb = traceback.format_exc()
@@ -933,7 +939,7 @@ class Command(BaseCommand):
         # or from the task system, we need to create a new lock at this level
         # (even though inventory_import.Command.handle -- which calls
         # perform_update -- has its own lock, inventory_ID_import)
-        with advisory_lock('inventory_{}_perform_update'.format(self.inventory.id)):
+        with advisory_lock(f'inventory_{self.inventory.id}_perform_update'):
 
             try:
                 self.check_license()

@@ -24,12 +24,12 @@ class Command(BaseCommand):
         hostname = options.get('hostname')
         if not hostname:
             raise CommandError("--hostname is a required argument")
-        with advisory_lock('instance_registration_%s' % hostname):
+        with advisory_lock(f'instance_registration_{hostname}'):
             instance = Instance.objects.filter(hostname=hostname)
             if instance.exists():
                 instance.delete()
                 print("Instance Removed")
-                print('Successfully deprovisioned {}'.format(hostname))
+                print(f'Successfully deprovisioned {hostname}')
                 print('(changed: True)')
             else:
-                print('No instance found matching name {}'.format(hostname))
+                print(f'No instance found matching name {hostname}')

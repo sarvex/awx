@@ -85,18 +85,16 @@ def get_activity_stream_class():
 
 def get_current_user_or_none():
     u = get_current_user()
-    if not isinstance(u, User):
-        return None
-    return u
+    return None if not isinstance(u, User) else u
 
 
 def emit_update_inventory_on_created_or_deleted(sender, **kwargs):
     if getattr(_inventory_updates, 'is_updating', False):
         return
     instance = kwargs['instance']
-    if ('created' in kwargs and kwargs['created']) or kwargs['signal'] == post_delete:
-        pass
-    else:
+    if ('created' not in kwargs or not kwargs['created']) and kwargs[
+        'signal'
+    ] != post_delete:
         return
     sender_name = str(sender._meta.verbose_name)
     logger.debug("%s created or deleted, updating inventory computed fields: %r %r", sender_name, sender, kwargs)
@@ -138,7 +136,7 @@ def sync_superuser_status_to_rbac(instance, **kwargs):
 def sync_rbac_to_superuser_status(instance, sender, **kwargs):
     'When the is_superuser flag is false but a user has the System Admin role, update the database to reflect that'
     if kwargs['action'] in ['post_add', 'post_remove', 'post_clear']:
-        new_status_value = bool(kwargs['action'] == 'post_add')
+        new_status_value = kwargs['action'] == 'post_add'
         if hasattr(instance, 'singleton_name'):  # duck typing, role.members.add() vs user.roles.add()
             role = instance
             if role.singleton_name == ROLE_SINGLETON_SYSTEM_ADMINISTRATOR:
@@ -158,30 +156,31 @@ def sync_rbac_to_superuser_status(instance, sender, **kwargs):
 
 def rbac_activity_stream(instance, sender, **kwargs):
     # Only if we are associating/disassociating
-    if kwargs['action'] in ['pre_add', 'pre_remove']:
-        if hasattr(instance, 'content_type'):  # Duck typing, migration-independent isinstance(instance, Role)
-            if instance.content_type_id is None and instance.singleton_name == ROLE_SINGLETON_SYSTEM_ADMINISTRATOR:
-                # Skip entries for the system admin role because user serializer covers it
-                # System auditor role is shown in the serializer, but its relationship is
-                # managed separately, its value is incorrect, and a correction entry is needed
-                return
-            # This juggles which role to use, because could be A->B or B->A association
-            if sender.__name__ == 'Role_parents':
-                role = kwargs['model'].objects.filter(pk__in=kwargs['pk_set']).first()
-                # don't record implicit creation / parents in activity stream
-                if role is not None and is_implicit_parent(parent_role=role, child_role=instance):
-                    return
-            else:
-                role = instance
-            # If a singleton role is the instance, the singleton role is acted on
-            # otherwise the related object is considered to be acted on
-            if instance.content_object:
-                instance = instance.content_object
-        else:
-            # Association with actor, like role->user
+    if kwargs['action'] not in ['pre_add', 'pre_remove']:
+        return
+    if hasattr(instance, 'content_type'):  # Duck typing, migration-independent isinstance(instance, Role)
+        if instance.content_type_id is None and instance.singleton_name == ROLE_SINGLETON_SYSTEM_ADMINISTRATOR:
+            # Skip entries for the system admin role because user serializer covers it
+            # System auditor role is shown in the serializer, but its relationship is
+            # managed separately, its value is incorrect, and a correction entry is needed
+            return
+        # This juggles which role to use, because could be A->B or B->A association
+        if sender.__name__ == 'Role_parents':
             role = kwargs['model'].objects.filter(pk__in=kwargs['pk_set']).first()
+            # don't record implicit creation / parents in activity stream
+            if role is not None and is_implicit_parent(parent_role=role, child_role=instance):
+                return
+        else:
+            role = instance
+        # If a singleton role is the instance, the singleton role is acted on
+        # otherwise the related object is considered to be acted on
+        if instance.content_object:
+            instance = instance.content_object
+    else:
+        # Association with actor, like role->user
+        role = kwargs['model'].objects.filter(pk__in=kwargs['pk_set']).first()
 
-        activity_stream_associate(sender, instance, role=role, **kwargs)
+    activity_stream_associate(sender, instance, role=role, **kwargs)
 
 
 def cleanup_detached_labels_on_deleted_parent(sender, instance, **kwargs):
@@ -200,7 +199,12 @@ def save_related_job_templates(sender, instance, **kwargs):
         raise ValueError('This signal callback is only intended for use with Project or Inventory')
 
     update_fields = kwargs.get('update_fields', None)
-    if (update_fields and not ('organization' in update_fields or 'organization_id' in update_fields)) or kwargs.get('created', False):
+    if (
+        update_fields
+        and 'organization' not in update_fields
+        and 'organization_id' not in update_fields
+        or kwargs.get('created', False)
+    ):
         return
 
     if instance._prior_values_store.get('organization_id') != instance.organization_id:
@@ -209,9 +213,7 @@ def save_related_job_templates(sender, instance, **kwargs):
             parents_added, parents_removed = update_role_parentage_for_instance(jt)
             if parents_added or parents_removed:
                 logger.info(
-                    'Permissions on JT {} changed due to inventory {} organization change from {} to {}.'.format(
-                        jt.pk, instance.pk, instance._prior_values_store.get('organization_id'), instance.organization_id
-                    )
+                    f"Permissions on JT {jt.pk} changed due to inventory {instance.pk} organization change from {instance._prior_values_store.get('organization_id')} to {instance.organization_id}."
                 )
 
 
@@ -273,11 +275,9 @@ def migrate_children_from_deleted_group_to_parent_groups(sender, **kwargs):
                         parent_group.children.add(child_group)
                 inventory_pk = getattr(instance, '_saved_inventory_pk', None)
                 if inventory_pk and not is_updating:
-                    try:
+                    with contextlib.suppress(Inventory.DoesNotExist, Project.DoesNotExist):
                         inventory = Inventory.objects.get(pk=inventory_pk)
                         inventory.update_computed_fields()
-                    except (Inventory.DoesNotExist, Project.DoesNotExist):
-                        pass
 
 
 # Update host pointers to last_job and last_job_host_summary when a job is deleted
@@ -408,12 +408,10 @@ def emit_activity_stream_change(instance):
         return
     from awx.api.serializers import ActivityStreamSerializer
 
-    actor = None
-    if instance.actor:
-        actor = instance.actor.username
+    actor = instance.actor.username if instance.actor else None
     summary_fields = ActivityStreamSerializer(instance).get_summary_fields(instance)
     analytics_logger.info(
-        'Activity Stream update entry for %s' % str(instance.object1),
+        f'Activity Stream update entry for {str(instance.object1)}',
         extra=dict(
             changes=instance.changes,
             relationship=instance.object_relationship_type,
@@ -427,31 +425,34 @@ def emit_activity_stream_change(instance):
 
 
 def activity_stream_create(sender, instance, created, **kwargs):
-    if created and activity_stream_enabled:
-        _type = type(instance)
-        if getattr(_type, '_deferred', False):
-            return
-        object1 = camelcase_to_underscore(instance.__class__.__name__)
-        changes = model_to_dict(instance, model_serializer_mapping())
+    if not created or not activity_stream_enabled:
+        return
+    _type = type(instance)
+    if getattr(_type, '_deferred', False):
+        return
+    object1 = camelcase_to_underscore(instance.__class__.__name__)
+    changes = model_to_dict(instance, model_serializer_mapping())
         # Special case where Job survey password variables need to be hidden
-        if type(instance) == Job:
-            changes['credentials'] = ['{} ({})'.format(c.name, c.id) for c in instance.credentials.iterator()]
-            changes['labels'] = [label.name for label in instance.labels.iterator()]
-            if 'extra_vars' in changes:
-                changes['extra_vars'] = instance.display_extra_vars()
-        if type(instance) == OAuth2AccessToken:
-            changes['token'] = CENSOR_VALUE
-        activity_entry = get_activity_stream_class()(operation='create', object1=object1, changes=json.dumps(changes), actor=get_current_user_or_none())
-        # TODO: Weird situation where cascade SETNULL doesn't work
-        #      it might actually be a good idea to remove all of these FK references since
-        #      we don't really use them anyway.
-        if instance._meta.model_name != 'setting':  # Is not conf.Setting instance
-            activity_entry.save()
-            getattr(activity_entry, object1).add(instance.pk)
-        else:
-            activity_entry.setting = conf_to_dict(instance)
-            activity_entry.save()
-        connection.on_commit(lambda: emit_activity_stream_change(activity_entry))
+    if type(instance) == Job:
+        changes['credentials'] = [
+            f'{c.name} ({c.id})' for c in instance.credentials.iterator()
+        ]
+        changes['labels'] = [label.name for label in instance.labels.iterator()]
+        if 'extra_vars' in changes:
+            changes['extra_vars'] = instance.display_extra_vars()
+    if type(instance) == OAuth2AccessToken:
+        changes['token'] = CENSOR_VALUE
+    activity_entry = get_activity_stream_class()(operation='create', object1=object1, changes=json.dumps(changes), actor=get_current_user_or_none())
+    # TODO: Weird situation where cascade SETNULL doesn't work
+    #      it might actually be a good idea to remove all of these FK references since
+    #      we don't really use them anyway.
+    if instance._meta.model_name != 'setting':  # Is not conf.Setting instance
+        activity_entry.save()
+        getattr(activity_entry, object1).add(instance.pk)
+    else:
+        activity_entry.setting = conf_to_dict(instance)
+        activity_entry.save()
+    connection.on_commit(lambda: emit_activity_stream_change(activity_entry))
 
 
 def activity_stream_update(sender, instance, **kwargs):
@@ -500,7 +501,7 @@ def activity_stream_delete(sender, instance, **kwargs):
     _type = type(instance)
     if getattr(_type, '_deferred', False):
         return
-    changes.update(model_to_dict(instance, model_serializer_mapping()))
+    changes |= model_to_dict(instance, model_serializer_mapping())
     object1 = camelcase_to_underscore(instance.__class__.__name__)
     if type(instance) == OAuth2AccessToken:
         changes['token'] = CENSOR_VALUE
@@ -524,7 +525,7 @@ def activity_stream_associate(sender, instance, **kwargs):
         if getattr(_type, '_deferred', False):
             return
         object1 = camelcase_to_underscore(obj1.__class__.__name__)
-        obj_rel = sender.__module__ + "." + sender.__name__
+        obj_rel = f"{sender.__module__}.{sender.__name__}"
 
         for entity_acted in kwargs['pk_set']:
             obj2 = kwargs['model']
@@ -664,7 +665,10 @@ def save_user_session_membership(sender, **kwargs):
             Session.objects.filter(session_key__in=[membership.session_id]).delete()
             membership.delete()
         if len(expired):
-            consumers.emit_channel_notification('control-limit_reached_{}'.format(user_id), dict(group_name='control', reason='limit_reached'))
+            consumers.emit_channel_notification(
+                f'control-limit_reached_{user_id}',
+                dict(group_name='control', reason='limit_reached'),
+            )
 
 
 @receiver(post_save, sender=OAuth2AccessToken)

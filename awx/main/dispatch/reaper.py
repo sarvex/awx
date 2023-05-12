@@ -26,7 +26,7 @@ def reap_job(j, status):
     if hasattr(j, 'send_notification_templates'):
         j.send_notification_templates('failed')
     j.websocket_emit_status(status)
-    logger.error('{} is no longer running; reaping'.format(j.log_format))
+    logger.error(f'{j.log_format} is no longer running; reaping')
 
 
 def reap(instance=None, status='failed', excluded_uuids=[]):
@@ -37,7 +37,7 @@ def reap(instance=None, status='failed', excluded_uuids=[]):
     if me is None:
         (changed, me) = Instance.objects.get_or_register()
         if changed:
-            logger.info("Registered node '{}'".format(me.hostname))
+            logger.info(f"Registered node '{me.hostname}'")
     now = tz_now()
     workflow_ctype_id = ContentType.objects.get_for_model(WorkflowJob).id
     jobs = UnifiedJob.objects.filter(

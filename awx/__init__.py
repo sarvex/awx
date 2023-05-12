@@ -80,14 +80,7 @@ def oauth2_getattribute(self, attr):
     # oauth2_provider.settings.OAuth2ProviderSettings.__getattribute__
     from django.conf import settings
 
-    val = None
-    if 'migrate' not in sys.argv:
-        # certain Django OAuth Toolkit migrations actually reference
-        # setting lookups for references to model classes (e.g.,
-        # oauth2_settings.REFRESH_TOKEN_MODEL)
-        # If we're doing an OAuth2 setting lookup *while running* a migration,
-        # don't do our usual database settings lookup
-        val = settings.OAUTH2_PROVIDER.get(attr)
+    val = settings.OAUTH2_PROVIDER.get(attr) if 'migrate' not in sys.argv else None
     if val is None:
         val = object.__getattribute__(self, attr)
     return val
@@ -95,7 +88,7 @@ def oauth2_getattribute(self, attr):
 
 def prepare_env():
     # Update the default settings environment variable based on current mode.
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'awx.settings.%s' % MODE)
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', f'awx.settings.{MODE}')
     # Hide DeprecationWarnings when running in production.  Need to first load
     # settings to apply our filter after Django's own warnings filter.
     from django.conf import settings
@@ -117,8 +110,8 @@ def prepare_env():
     # database settings to use when management command is run as an external
     # program via unit tests.
     for opt in ('ENGINE', 'NAME', 'USER', 'PASSWORD', 'HOST', 'PORT'):  # pragma: no cover
-        if os.environ.get('AWX_TEST_DATABASE_%s' % opt, None):
-            settings.DATABASES['default'][opt] = os.environ['AWX_TEST_DATABASE_%s' % opt]
+        if os.environ.get(f'AWX_TEST_DATABASE_{opt}', None):
+            settings.DATABASES['default'][opt] = os.environ[f'AWX_TEST_DATABASE_{opt}']
     # Disable capturing all SQL queries in memory when in DEBUG mode.
     if settings.DEBUG and not getattr(settings, 'SQL_DEBUG', True):
         from django.db.backends.base.base import BaseDatabaseWrapper
@@ -135,7 +128,7 @@ def prepare_env():
 
     def handle(self, *args, **options):
         if not options.get('addrport'):
-            options['addrport'] = '%s:%d' % (default_addr, int(default_port))
+            options['addrport'] = '%s:%d' % (default_addr, default_port)
         elif options.get('addrport').isdigit():
             options['addrport'] = '%s:%d' % (default_addr, int(options['addrport']))
         return original_handle(self, *args, **options)
@@ -151,10 +144,13 @@ def manage():
     from django.core.management import execute_from_command_line
 
     # enforce the postgres version is equal to 12. if not, then terminate program with exit code of 1
-    if not os.getenv('SKIP_PG_VERSION_CHECK', False) and not MODE == 'development':
-        if (connection.pg_version // 10000) < 12:
-            sys.stderr.write("Postgres version 12 is required\n")
-            sys.exit(1)
+    if (
+        not os.getenv('SKIP_PG_VERSION_CHECK', False)
+        and MODE != 'development'
+        and (connection.pg_version // 10000) < 12
+    ):
+        sys.stderr.write("Postgres version 12 is required\n")
+        sys.exit(1)
 
     if len(sys.argv) >= 2 and sys.argv[1] in ('version', '--version'):  # pragma: no cover
         sys.stdout.write('%s\n' % __version__)

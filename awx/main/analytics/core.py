@@ -131,12 +131,11 @@ def calculate_collection_interval(since, until):
     # set it to `now`, but only if that isn't more than 4 weeks ahead of a passed-in
     # `since` parameter.
     if since is not None:
-        if until is not None:
-            if until > since + timedelta(weeks=4):
-                until = since + timedelta(weeks=4)
-                logger.warning(f"End of the collection interval is greater than 4 weeks from start, setting end to {until}.")
-        else:  # until is None
+        if until is None:  # until is None
             until = min(since + timedelta(weeks=4), _now)
+        elif until > since + timedelta(weeks=4):
+            until = since + timedelta(weeks=4)
+            logger.warning(f"End of the collection interval is greater than 4 weeks from start, setting end to {until}.")
     elif until is None:
         until = _now
 
@@ -193,7 +192,9 @@ def gather(dest=None, module=None, subset=None, since=None, until=None, collecti
         from awx.main.analytics import collectors
         from awx.main.signals import disable_activity_stream
 
-        logger.debug("Last analytics run was: {}".format(settings.AUTOMATION_ANALYTICS_LAST_GATHER))
+        logger.debug(
+            f"Last analytics run was: {settings.AUTOMATION_ANALYTICS_LAST_GATHER}"
+        )
 
         try:
             since, until, last_gather = calculate_collection_interval(since, until)
@@ -209,7 +210,7 @@ def gather(dest=None, module=None, subset=None, since=None, until=None, collecti
             for name, func in inspect.getmembers(collector_module)
             if inspect.isfunction(func) and hasattr(func, '__awx_analytics_key__') and (not subset or name in subset)
         ]
-        if not any(c.__awx_analytics_key__ == 'config' for c in collector_list):
+        if all(c.__awx_analytics_key__ != 'config' for c in collector_list):
             # In order to ship to analytics, we must include the output of the built-in 'config' collector.
             collector_list.append(collectors.config)
 
@@ -233,7 +234,7 @@ def gather(dest=None, module=None, subset=None, since=None, until=None, collecti
                 json.dumps(results, cls=DjangoJSONEncoder)  # throwaway check to see if the data is json-serializable
                 data[filename] = results
             except Exception:
-                logger.exception("Could not generate metric {}".format(filename))
+                logger.exception(f"Could not generate metric {filename}")
         if data:
             if data.get('config.json') is None:
                 logger.error("'config' collector data is missing.")
@@ -277,9 +278,11 @@ def gather(dest=None, module=None, subset=None, since=None, until=None, collecti
 
                     slice_succeeded = True
                     for fpath in files:
-                        payload = {filename: (fpath, func.__awx_analytics_version__)}
+                        payload = {
+                            filename: (fpath, func.__awx_analytics_version__),
+                            'config.json': data.get('config.json'),
+                        }
 
-                        payload['config.json'] = data.get('config.json')
                         if payload['config.json'] is None:
                             logger.error("'config' collector data is missing, and is required to ship.")
                             return None
@@ -287,10 +290,11 @@ def gather(dest=None, module=None, subset=None, since=None, until=None, collecti
                         tgzfile = package(dest.parent, payload, until)
                         if tgzfile is not None:
                             tarfiles.append(tgzfile)
-                            if collection_type != 'dry-run':
-                                if not ship(tgzfile):
-                                    slice_succeeded, succeeded = False, False
-                                    break
+                            if collection_type != 'dry-run' and not ship(
+                                tgzfile
+                            ):
+                                slice_succeeded, succeeded = False, False
+                                break
 
                     if slice_succeeded and collection_type != 'dry-run':
                         with disable_activity_stream():
@@ -299,7 +303,7 @@ def gather(dest=None, module=None, subset=None, since=None, until=None, collecti
                             settings.AUTOMATION_ANALYTICS_LAST_ENTRIES = json.dumps(last_entries, cls=DjangoJSONEncoder)
             except Exception:
                 succeeded = False
-                logger.exception("Could not generate metric {}".format(filename))
+                logger.exception(f"Could not generate metric {filename}")
 
         if collection_type != 'dry-run':
             if succeeded:
@@ -321,7 +325,7 @@ def gather(dest=None, module=None, subset=None, since=None, until=None, collecti
         shutil.rmtree(dest, ignore_errors=True)  # clean up individual artifact files
         if not tarfiles:
             # No data was collected
-            logger.warning("No data from {} to {}".format(since or last_gather, until))
+            logger.warning(f"No data from {since or last_gather} to {until}")
             return None
 
         return tarfiles
@@ -335,12 +339,12 @@ def ship(path):
         logger.error('Insights for Ansible Automation Platform TAR not found')
         return False
     if not os.path.exists(path):
-        logger.error('Insights for Ansible Automation Platform TAR {} not found'.format(path))
+        logger.error(f'Insights for Ansible Automation Platform TAR {path} not found')
         return False
     if "Error:" in str(path):
         return False
 
-    logger.debug('shipping analytics file: {}'.format(path))
+    logger.debug(f'shipping analytics file: {path}')
     url = getattr(settings, 'AUTOMATION_ANALYTICS_URL', None)
     if not url:
         logger.error('AUTOMATION_ANALYTICS_URL is not set')
@@ -364,7 +368,9 @@ def ship(path):
             )
         # Accept 2XX status_codes
         if response.status_code >= 300:
-            logger.error('Upload failed with status {}, {}'.format(response.status_code, response.text))
+            logger.error(
+                f'Upload failed with status {response.status_code}, {response.text}'
+            )
             return False
 
         return True

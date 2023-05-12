@@ -7,6 +7,8 @@ from django.db import migrations, models
 import django.db.models.deletion
 
 
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -17,20 +19,57 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='InventoryUpdateEvent',
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created', models.DateTimeField(default=None, editable=False)),
-                ('modified', models.DateTimeField(default=None, editable=False)),
-                ('event_data', awx.main.fields.JSONField(blank=True, default=dict)),
-                ('uuid', models.CharField(default='', editable=False, max_length=1024)),
-                ('counter', models.PositiveIntegerField(default=0, editable=False)),
+                (
+                    'id',
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name='ID',
+                    ),
+                ),
+                (
+                    'created',
+                    models.DateTimeField(default=None, editable=False),
+                ),
+                (
+                    'modified',
+                    models.DateTimeField(default=None, editable=False),
+                ),
+                (
+                    'event_data',
+                    awx.main.fields.JSONField(blank=True, default=dict),
+                ),
+                (
+                    'uuid',
+                    models.CharField(
+                        default='', editable=False, max_length=1024
+                    ),
+                ),
+                (
+                    'counter',
+                    models.PositiveIntegerField(default=0, editable=False),
+                ),
                 ('stdout', models.TextField(default='', editable=False)),
-                ('verbosity', models.PositiveIntegerField(default=0, editable=False)),
-                ('start_line', models.PositiveIntegerField(default=0, editable=False)),
-                ('end_line', models.PositiveIntegerField(default=0, editable=False)),
+                (
+                    'verbosity',
+                    models.PositiveIntegerField(default=0, editable=False),
+                ),
+                (
+                    'start_line',
+                    models.PositiveIntegerField(default=0, editable=False),
+                ),
+                (
+                    'end_line',
+                    models.PositiveIntegerField(default=0, editable=False),
+                ),
                 (
                     'inventory_update',
                     models.ForeignKey(
-                        editable=False, on_delete=django.db.models.deletion.CASCADE, related_name='inventory_update_events', to='main.InventoryUpdate'
+                        editable=False,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name='inventory_update_events',
+                        to='main.InventoryUpdate',
                     ),
                 ),
             ],
@@ -41,9 +80,23 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ProjectUpdateEvent',
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created', models.DateTimeField(default=None, editable=False)),
-                ('modified', models.DateTimeField(default=None, editable=False)),
+                (
+                    'id',
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name='ID',
+                    ),
+                ),
+                (
+                    'created',
+                    models.DateTimeField(default=None, editable=False),
+                ),
+                (
+                    'modified',
+                    models.DateTimeField(default=None, editable=False),
+                ),
                 (
                     'event',
                     models.CharField(
@@ -65,13 +118,25 @@ class Migration(migrations.Migration):
                             ('playbook_on_start', 'Playbook Started'),
                             ('playbook_on_notify', 'Running Handlers'),
                             ('playbook_on_include', 'Including File'),
-                            ('playbook_on_no_hosts_matched', 'No Hosts Matched'),
-                            ('playbook_on_no_hosts_remaining', 'No Hosts Remaining'),
+                            (
+                                'playbook_on_no_hosts_matched',
+                                'No Hosts Matched',
+                            ),
+                            (
+                                'playbook_on_no_hosts_remaining',
+                                'No Hosts Remaining',
+                            ),
                             ('playbook_on_task_start', 'Task Started'),
                             ('playbook_on_vars_prompt', 'Variables Prompted'),
                             ('playbook_on_setup', 'Gathering Facts'),
-                            ('playbook_on_import_for_host', 'internal: on Import for Host'),
-                            ('playbook_on_not_import_for_host', 'internal: on Not Import for Host'),
+                            (
+                                'playbook_on_import_for_host',
+                                'internal: on Import for Host',
+                            ),
+                            (
+                                'playbook_on_not_import_for_host',
+                                'internal: on Not Import for Host',
+                            ),
                             ('playbook_on_play_start', 'Play Started'),
                             ('playbook_on_stats', 'Playbook Complete'),
                             ('debug', 'Debug'),
@@ -84,23 +149,69 @@ class Migration(migrations.Migration):
                         max_length=100,
                     ),
                 ),
-                ('event_data', awx.main.fields.JSONField(blank=True, default=dict)),
+                (
+                    'event_data',
+                    awx.main.fields.JSONField(blank=True, default=dict),
+                ),
                 ('failed', models.BooleanField(default=False, editable=False)),
-                ('changed', models.BooleanField(default=False, editable=False)),
-                ('uuid', models.CharField(default='', editable=False, max_length=1024)),
-                ('playbook', models.CharField(default='', editable=False, max_length=1024)),
-                ('play', models.CharField(default='', editable=False, max_length=1024)),
-                ('role', models.CharField(default='', editable=False, max_length=1024)),
-                ('task', models.CharField(default='', editable=False, max_length=1024)),
-                ('counter', models.PositiveIntegerField(default=0, editable=False)),
+                (
+                    'changed',
+                    models.BooleanField(default=False, editable=False),
+                ),
+                (
+                    'uuid',
+                    models.CharField(
+                        default='', editable=False, max_length=1024
+                    ),
+                ),
+                (
+                    'playbook',
+                    models.CharField(
+                        default='', editable=False, max_length=1024
+                    ),
+                ),
+                (
+                    'play',
+                    models.CharField(
+                        default='', editable=False, max_length=1024
+                    ),
+                ),
+                (
+                    'role',
+                    models.CharField(
+                        default='', editable=False, max_length=1024
+                    ),
+                ),
+                (
+                    'task',
+                    models.CharField(
+                        default='', editable=False, max_length=1024
+                    ),
+                ),
+                (
+                    'counter',
+                    models.PositiveIntegerField(default=0, editable=False),
+                ),
                 ('stdout', models.TextField(default='', editable=False)),
-                ('verbosity', models.PositiveIntegerField(default=0, editable=False)),
-                ('start_line', models.PositiveIntegerField(default=0, editable=False)),
-                ('end_line', models.PositiveIntegerField(default=0, editable=False)),
+                (
+                    'verbosity',
+                    models.PositiveIntegerField(default=0, editable=False),
+                ),
+                (
+                    'start_line',
+                    models.PositiveIntegerField(default=0, editable=False),
+                ),
+                (
+                    'end_line',
+                    models.PositiveIntegerField(default=0, editable=False),
+                ),
                 (
                     'project_update',
                     models.ForeignKey(
-                        editable=False, on_delete=django.db.models.deletion.CASCADE, related_name='project_update_events', to='main.ProjectUpdate'
+                        editable=False,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name='project_update_events',
+                        to='main.ProjectUpdate',
                     ),
                 ),
             ],
@@ -111,19 +222,58 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='SystemJobEvent',
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created', models.DateTimeField(default=None, editable=False)),
-                ('modified', models.DateTimeField(default=None, editable=False)),
-                ('event_data', awx.main.fields.JSONField(blank=True, default=dict)),
-                ('uuid', models.CharField(default='', editable=False, max_length=1024)),
-                ('counter', models.PositiveIntegerField(default=0, editable=False)),
+                (
+                    'id',
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name='ID',
+                    ),
+                ),
+                (
+                    'created',
+                    models.DateTimeField(default=None, editable=False),
+                ),
+                (
+                    'modified',
+                    models.DateTimeField(default=None, editable=False),
+                ),
+                (
+                    'event_data',
+                    awx.main.fields.JSONField(blank=True, default=dict),
+                ),
+                (
+                    'uuid',
+                    models.CharField(
+                        default='', editable=False, max_length=1024
+                    ),
+                ),
+                (
+                    'counter',
+                    models.PositiveIntegerField(default=0, editable=False),
+                ),
                 ('stdout', models.TextField(default='', editable=False)),
-                ('verbosity', models.PositiveIntegerField(default=0, editable=False)),
-                ('start_line', models.PositiveIntegerField(default=0, editable=False)),
-                ('end_line', models.PositiveIntegerField(default=0, editable=False)),
+                (
+                    'verbosity',
+                    models.PositiveIntegerField(default=0, editable=False),
+                ),
+                (
+                    'start_line',
+                    models.PositiveIntegerField(default=0, editable=False),
+                ),
+                (
+                    'end_line',
+                    models.PositiveIntegerField(default=0, editable=False),
+                ),
                 (
                     'system_job',
-                    models.ForeignKey(editable=False, on_delete=django.db.models.deletion.CASCADE, related_name='system_job_events', to='main.SystemJob'),
+                    models.ForeignKey(
+                        editable=False,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name='system_job_events',
+                        to='main.SystemJob',
+                    ),
                 ),
             ],
             options={
@@ -132,15 +282,28 @@ class Migration(migrations.Migration):
         ),
         migrations.AlterIndexTogether(
             name='inventoryupdateevent',
-            index_together=set([('inventory_update', 'start_line'), ('inventory_update', 'uuid'), ('inventory_update', 'end_line')]),
+            index_together={
+                ('inventory_update', 'start_line'),
+                ('inventory_update', 'uuid'),
+                ('inventory_update', 'end_line'),
+            },
         ),
         migrations.AlterIndexTogether(
             name='projectupdateevent',
-            index_together=set([('project_update', 'event'), ('project_update', 'end_line'), ('project_update', 'start_line'), ('project_update', 'uuid')]),
+            index_together={
+                ('project_update', 'event'),
+                ('project_update', 'end_line'),
+                ('project_update', 'start_line'),
+                ('project_update', 'uuid'),
+            },
         ),
         migrations.AlterIndexTogether(
             name='systemjobevent',
-            index_together=set([('system_job', 'end_line'), ('system_job', 'uuid'), ('system_job', 'start_line')]),
+            index_together={
+                ('system_job', 'end_line'),
+                ('system_job', 'uuid'),
+                ('system_job', 'start_line'),
+            },
         ),
         migrations.RemoveField(
             model_name='unifiedjob',

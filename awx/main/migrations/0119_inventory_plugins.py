@@ -26,7 +26,7 @@ def inventory_source_vars_forward(apps, schema_editor):
     InventorySourceOptions is not needed by the injector logic.
     '''
     setattr(InventorySource, 'source_vars_dict', VarsDictProperty('source_vars'))
-    source_vars_backup = dict()
+    source_vars_backup = {}
 
     for inv_source_obj in _get_inventory_sources(InventorySource):
 

@@ -109,9 +109,10 @@ def authentication_validate(serializer, attrs):
         'RADIUS_SERVER',
         'TACACSPLUS_HOST',
     ]
-    if attrs.get('DISABLE_LOCAL_AUTH', False):
-        if not any(getattr(settings, s, None) for s in remote_auth_settings):
-            raise serializers.ValidationError(_("There are no remote authentication systems configured."))
+    if attrs.get('DISABLE_LOCAL_AUTH', False) and not any(
+        getattr(settings, s, None) for s in remote_auth_settings
+    ):
+        raise serializers.ValidationError(_("There are no remote authentication systems configured."))
     return attrs
 
 

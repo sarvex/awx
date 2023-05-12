@@ -25,7 +25,7 @@ class Command(BaseCommand):
         queuename = options.get('queuename')
         if not queuename:
             raise CommandError('Must specify `--queuename` in order to use command.')
-        with advisory_lock('instance_group_registration_%s' % queuename):
+        with advisory_lock(f'instance_group_registration_{queuename}'):
             ig = InstanceGroup.objects.filter(name=queuename)
             if not ig.exists():
                 print("Instance group doesn't exist")

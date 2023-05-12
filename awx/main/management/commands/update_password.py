@@ -33,7 +33,6 @@ class Command(BaseCommand):
             raise CommandError('password required')
 
         cp = UpdatePassword()
-        res = cp.update_password(options['username'], options['password'])
-        if res:
+        if res := cp.update_password(options['username'], options['password']):
             return "Password updated"
         return "Password not updated"

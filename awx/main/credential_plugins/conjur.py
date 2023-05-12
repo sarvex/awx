@@ -74,7 +74,7 @@ def conjur_backend(**kwargs):
     token = base64.b64encode(resp.content).decode('utf-8')
 
     lookup_kwargs = {
-        'headers': {'Authorization': 'Token token="{}"'.format(token)},
+        'headers': {'Authorization': f'Token token="{token}"'},
         'allow_redirects': False,
     }
 

@@ -50,8 +50,7 @@ class Command(BaseCommand):
                 warnings.warn(f"Source node {options['source']} should not link to nodes already peering to it: {peers & incoming}.")
 
         if options['peers']:
-            missing_peers = set(options['peers']) - set(nodes)
-            if missing_peers:
+            if missing_peers := set(options['peers']) - set(nodes):
                 missing = ' '.join(missing_peers)
                 raise CommandError(f"Peers not currently registered as instances: {missing}")
 

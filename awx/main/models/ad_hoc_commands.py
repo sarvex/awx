@@ -91,10 +91,10 @@ class AdHocCommand(UnifiedJob, JobNotificationMixin):
     extra_vars_dict = VarsDictProperty('extra_vars', True)
 
     def clean_inventory(self):
-        inv = self.inventory
-        if not inv:
+        if inv := self.inventory:
+            return inv
+        else:
             raise ValidationError(_('No valid inventory.'))
-        return inv
 
     def clean_credential(self):
         cred = self.credential
@@ -134,10 +134,7 @@ class AdHocCommand(UnifiedJob, JobNotificationMixin):
     @property
     def passwords_needed_to_start(self):
         '''Return list of password field names needed to start the job.'''
-        if self.credential:
-            return self.credential.passwords_needed
-        else:
-            return []
+        return self.credential.passwords_needed if self.credential else []
 
     def _get_parent_field_name(self):
         return ''
@@ -156,7 +153,7 @@ class AdHocCommand(UnifiedJob, JobNotificationMixin):
         return reverse('api:ad_hoc_command_detail', kwargs={'pk': self.pk}, request=request)
 
     def get_ui_url(self):
-        return urljoin(settings.TOWER_URL_BASE, "/#/jobs/command/{}".format(self.pk))
+        return urljoin(settings.TOWER_URL_BASE, f"/#/jobs/command/{self.pk}")
 
     @property
     def notification_templates(self):
@@ -187,22 +184,23 @@ class AdHocCommand(UnifiedJob, JobNotificationMixin):
         return min(count_hosts, 5 if self.forks == 0 else self.forks) + 1
 
     def copy(self):
-        data = {}
-        for field in (
-            'job_type',
-            'inventory_id',
-            'limit',
-            'credential_id',
-            'execution_environment_id',
-            'module_name',
-            'module_args',
-            'forks',
-            'verbosity',
-            'extra_vars',
-            'become_enabled',
-            'diff_mode',
-        ):
-            data[field] = getattr(self, field)
+        data = {
+            field: getattr(self, field)
+            for field in (
+                'job_type',
+                'inventory_id',
+                'limit',
+                'credential_id',
+                'execution_environment_id',
+                'module_name',
+                'module_args',
+                'forks',
+                'verbosity',
+                'extra_vars',
+                'become_enabled',
+                'diff_mode',
+            )
+        }
         return AdHocCommand.objects.create(**data)
 
     def save(self, *args, **kwargs):
@@ -216,17 +214,15 @@ class AdHocCommand(UnifiedJob, JobNotificationMixin):
     @property
     def preferred_instance_groups(self):
         if self.inventory is not None and self.inventory.organization is not None:
-            organization_groups = [x for x in self.inventory.organization.instance_groups.all()]
+            organization_groups = list(self.inventory.organization.instance_groups.all())
         else:
             organization_groups = []
         if self.inventory is not None:
-            inventory_groups = [x for x in self.inventory.instance_groups.all()]
+            inventory_groups = list(self.inventory.instance_groups.all())
         else:
             inventory_groups = []
         selected_groups = inventory_groups + organization_groups
-        if not selected_groups:
-            return self.global_instance_groups
-        return selected_groups
+        return self.global_instance_groups if not selected_groups else selected_groups
 
     '''
     JobNotificationMixin
