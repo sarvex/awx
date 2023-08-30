@@ -34,7 +34,7 @@ JSON-log-formatter
 jsonschema
 Markdown  # used for formatting API help
 openshift
-pexpect==4.7.0 # see library notes
+pexpect==4.8.0 # see library notes
 prometheus_client
 psycopg
 psutil
