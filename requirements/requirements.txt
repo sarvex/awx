@@ -92,8 +92,6 @@ daphne==3.0.2
     # via
     #   -r requirements/requirements.in
     #   channels
-dataclasses==0.6
-    # via python-dsv-sdk
 defusedxml==0.7.1
     # via
     #   python3-openid
@@ -302,7 +300,7 @@ python-dateutil==2.8.2
     #   botocore
     #   kubernetes
     #   receptorctl
-python-dsv-sdk==1.0.1
+python-dsv-sdk==1.0.4
     # via -r requirements/requirements.in
 python-jose==3.3.0
     # via social-auth-core
