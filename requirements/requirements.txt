@@ -194,7 +194,7 @@ jaraco-logging==3.1.2
     # via irc
 jaraco-stream==3.0.3
     # via irc
-jaraco-text==3.11.0
+jaraco-text==3.11.1
     # via
     #   irc
     #   jaraco-collections
