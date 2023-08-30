@@ -102,7 +102,7 @@ deprecated==1.2.13
     # via jwcrypto
 distro==1.8.0
     # via -r requirements/requirements.in
-django==4.2.3
+django==4.2.4
     # via
     #   -r requirements/requirements.in
     #   channels
