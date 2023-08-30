@@ -121,7 +121,7 @@ django-cors-headers==3.13.0
     # via -r requirements/requirements.in
 django-crum==0.7.9
     # via -r requirements/requirements.in
-django-extensions==3.2.1
+django-extensions==3.2.3
     # via -r requirements/requirements.in
 django-guid==3.2.1
     # via -r requirements/requirements.in
