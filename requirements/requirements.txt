@@ -204,7 +204,7 @@ jmespath==1.0.1
     # via
     #   boto3
     #   botocore
-json-log-formatter==0.5.1
+json-log-formatter==0.5.2
     # via -r requirements/requirements.in
 jsonschema==4.17.3
     # via -r requirements/requirements.in
