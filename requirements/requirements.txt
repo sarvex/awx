@@ -253,7 +253,7 @@ pexpect==4.8.0
     # via -r requirements/requirements.in
 pkgconfig==1.5.5
     # via -r requirements/requirements.in
-prometheus-client==0.15.0
+prometheus-client==0.17.1
     # via -r requirements/requirements.in
 psutil==5.9.4
     # via -r requirements/requirements.in
