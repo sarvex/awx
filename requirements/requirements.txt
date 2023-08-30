@@ -175,7 +175,7 @@ incremental==22.10.0
     # via twisted
 inflect==6.0.2
     # via jaraco-text
-irc==20.1.0
+irc==20.3.0
     # via -r requirements/requirements.in
 isodate==0.6.1
     # via msrest
