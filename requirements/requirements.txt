@@ -363,7 +363,7 @@ service-identity==21.1.0
     # via twisted
 setuptools-rust==1.5.2
     # via -r requirements/requirements.in
-setuptools-scm[toml]==7.0.5
+setuptools-scm[toml]==7.1.0
     # via -r requirements/requirements.in
 six==1.16.0
     # via
@@ -400,8 +400,6 @@ tempora==5.1.0
     # via
     #   irc
     #   jaraco-logging
-tomli==2.0.1
-    # via setuptools-scm
 twilio==7.15.3
     # via -r requirements/requirements.in
 twisted[tls]==22.10.0
