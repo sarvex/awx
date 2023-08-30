@@ -98,7 +98,7 @@ defusedxml==0.7.1
     # via
     #   python3-openid
     #   social-auth-core
-deprecated==1.2.13
+deprecated==1.2.14
     # via jwcrypto
 distro==1.8.0
     # via -r requirements/requirements.in
