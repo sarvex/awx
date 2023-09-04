@@ -1,5 +1,3 @@
-adal==1.2.7
-    # via msrestazure
 aiohttp==3.8.5
     # via -r requirements/requirements.in
 aioredis==1.3.1
@@ -39,12 +37,22 @@ autocommand==2.2.2
 automat==22.10.0
     # via twisted
 azure-common==1.1.28
-    # via azure-keyvault
+    # via
+    #   azure-keyvault-certificates
+    #   azure-keyvault-keys
+    #   azure-keyvault-secrets
 azure-core==1.26.1
-    # via msrest
-azure-keyvault==1.1.0
+    # via
+    #   azure-keyvault-certificates
+    #   azure-keyvault-keys
+    #   azure-keyvault-secrets
+azure-keyvault==4.2.0
     # via -r requirements/requirements.in
-azure-nspkg==3.0.2
+azure-keyvault-certificates==4.7.0
+    # via azure-keyvault
+azure-keyvault-keys==4.8.0
+    # via azure-keyvault
+azure-keyvault-secrets==4.7.0
     # via azure-keyvault
 boto3==1.26.102
     # via -r requirements/requirements.in
@@ -58,7 +66,6 @@ cachetools==5.2.0
 certifi==2023.7.22
     # via
     #   kubernetes
-    #   msrest
     #   requests
 cffi==1.15.1
     # via cryptography
@@ -79,9 +86,8 @@ constantly==15.1.0
 cryptography==41.0.3
     # via
     #   -r requirements/requirements.in
-    #   adal
     #   autobahn
-    #   azure-keyvault
+    #   azure-keyvault-keys
     #   jwcrypto
     #   pyopenssl
     #   service-identity
@@ -178,7 +184,10 @@ inflect==6.0.2
 irc==20.3.0
     # via -r requirements/requirements.in
 isodate==0.6.1
-    # via msrest
+    # via
+    #   azure-keyvault-certificates
+    #   azure-keyvault-keys
+    #   azure-keyvault-secrets
 jaraco-classes==3.2.3
     # via jaraco-collections
 jaraco-collections==3.8.0
@@ -226,12 +235,6 @@ more-itertools==9.0.0
     #   jaraco-text
 msgpack==1.0.4
     # via channels-redis
-msrest==0.7.1
-    # via
-    #   azure-keyvault
-    #   msrestazure
-msrestazure==0.6.4
-    # via azure-keyvault
 multidict==6.0.2
     # via
     #   aiohttp
@@ -244,9 +247,7 @@ oauthlib==3.2.2
 openshift==0.13.1
     # via -r requirements/requirements.in
 packaging==21.3
-    # via
-    #   redis
-    #   setuptools-scm
+    # via setuptools-scm
 pbr==5.11.0
     # via -r requirements/requirements.in
 pexpect==4.8.0
@@ -281,7 +282,6 @@ pygerduty==0.38.3
     # via -r requirements/requirements.in
 pyjwt==2.6.0
     # via
-    #   adal
     #   social-auth-core
     #   twilio
 pyopenssl==23.2.0
@@ -298,7 +298,6 @@ python-daemon==3.0.1
     # via -r requirements/requirements.in
 python-dateutil==2.8.2
     # via
-    #   adal
     #   botocore
     #   kubernetes
     #   receptorctl
@@ -335,12 +334,9 @@ redis==4.4.4
 requests==2.31.0
     # via
     #   -r requirements/requirements.in
-    #   adal
     #   azure-core
-    #   azure-keyvault
     #   django-oauth-toolkit
     #   kubernetes
-    #   msrest
     #   python-dsv-sdk
     #   python-tss-sdk
     #   requests-oauthlib
@@ -349,7 +345,6 @@ requests==2.31.0
 requests-oauthlib==1.3.1
     # via
     #   kubernetes
-    #   msrest
     #   social-auth-core
 rsa==4.9
     # via
@@ -374,7 +369,6 @@ six==1.16.0
     #   google-auth
     #   isodate
     #   kubernetes
-    #   msrestazure
     #   openshift
     #   pygerduty
     #   python-dateutil
@@ -411,6 +405,9 @@ txaio==22.2.1
 typing-extensions==4.4.0
     # via
     #   azure-core
+    #   azure-keyvault-certificates
+    #   azure-keyvault-keys
+    #   azure-keyvault-secrets
     #   psycopg
     #   pydantic
     #   setuptools-rust
