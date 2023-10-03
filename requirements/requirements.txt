@@ -1,15 +1,15 @@
 adal==1.2.7
     # via msrestazure
 aiohttp==3.8.5
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 aioredis==1.3.1
     # via channels-redis
 aiosignal==1.3.1
     # via aiohttp
 ansiconv==1.0.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 asciichartpy==1.5.25
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 asgiref==3.6.0
     # via
     #   channels
@@ -17,14 +17,14 @@ asgiref==3.6.0
     #   daphne
     #   django
 asn1==2.6.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 async-timeout==4.0.2
     # via
     #   aiohttp
     #   aioredis
     #   redis
 asyncpg==0.27.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 attrs==22.1.0
     # via
     #   aiohttp
@@ -43,14 +43,14 @@ azure-common==1.1.28
 azure-core==1.26.1
     # via msrest
 azure-keyvault==1.1.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 azure-nspkg==3.0.2
     # via azure-keyvault
 boto3==1.26.102
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 botocore==1.29.102
     # via
-    #   -r requirements/requirements.in
+    #   -r requirements.in
     #   boto3
     #   s3transfer
 cachetools==5.2.0
@@ -64,10 +64,10 @@ cffi==1.15.1
     # via cryptography
 channels==3.0.5
     # via
-    #   -r requirements/requirements.in
+    #   -r requirements.in
     #   channels-redis
 channels-redis==3.4.1
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 charset-normalizer==2.1.1
     # via
     #   aiohttp
@@ -78,7 +78,7 @@ constantly==15.1.0
     # via twisted
 cryptography==41.0.3
     # via
-    #   -r requirements/requirements.in
+    #   -r requirements.in
     #   adal
     #   autobahn
     #   azure-keyvault
@@ -87,10 +87,10 @@ cryptography==41.0.3
     #   service-identity
     #   social-auth-core
 cython==0.29.32
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 daphne==3.0.2
     # via
-    #   -r requirements/requirements.in
+    #   -r requirements.in
     #   channels
 dataclasses==0.6
     # via python-dsv-sdk
@@ -101,10 +101,10 @@ defusedxml==0.7.1
 deprecated==1.2.13
     # via jwcrypto
 distro==1.8.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 django==4.2.3
     # via
-    #   -r requirements/requirements.in
+    #   -r requirements.in
     #   channels
     #   django-auth-ldap
     #   django-cors-headers
@@ -116,29 +116,29 @@ django==4.2.3
     #   django-solo
     #   djangorestframework
 django-auth-ldap==4.1.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 django-cors-headers==3.13.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 django-crum==0.7.9
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 django-extensions==3.2.1
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 django-guid==3.2.1
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 django-oauth-toolkit==1.7.1
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 django-pglocks==1.0.4
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 django-polymorphic==3.1.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 django-solo==2.0.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 django-split-settings==1.0.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 djangorestframework==3.14.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 djangorestframework-yaml==2.0.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 docutils==0.19
     # via python-daemon
 ecdsa==0.18.0
@@ -146,7 +146,7 @@ ecdsa==0.18.0
 enum-compat==0.0.3
     # via asn1
 filelock==3.8.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 frozenlist==1.3.3
     # via
     #   aiohttp
@@ -154,12 +154,12 @@ frozenlist==1.3.3
 gitdb==4.0.10
     # via gitpython
 gitpython==3.1.32
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 google-auth==2.14.1
     # via kubernetes
 hiredis==2.0.0
     # via
-    #   -r requirements/requirements.in
+    #   -r requirements.in
     #   aioredis
 hyperlink==21.0.0
     # via
@@ -176,7 +176,7 @@ incremental==22.10.0
 inflect==6.0.2
     # via jaraco-text
 irc==20.3.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 isodate==0.6.1
     # via msrest
 jaraco-classes==3.2.3
@@ -199,15 +199,15 @@ jaraco-text==3.11.0
     #   irc
     #   jaraco-collections
 jinja2==3.1.2
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 jmespath==1.0.1
     # via
     #   boto3
     #   botocore
 json-log-formatter==0.5.1
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 jsonschema==4.17.3
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 jwcrypto==1.4.2
     # via django-oauth-toolkit
 kubernetes==25.3.0
@@ -215,7 +215,7 @@ kubernetes==25.3.0
 lockfile==0.12.2
     # via python-daemon
 markdown==3.4.1
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 markupsafe==2.1.1
     # via jinja2
 more-itertools==9.0.0
@@ -242,23 +242,21 @@ oauthlib==3.2.2
     #   requests-oauthlib
     #   social-auth-core
 openshift==0.13.1
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 packaging==21.3
-    # via
-    #   redis
-    #   setuptools-scm
+    # via setuptools-scm
 pbr==5.11.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 pexpect==4.8.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 pkgconfig==1.5.5
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 prometheus-client==0.17.1
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 psutil==5.9.4
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 psycopg==3.1.9
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 ptyprocess==0.7.0
     # via pexpect
 pyasn1==0.4.8
@@ -278,7 +276,7 @@ pycparser==2.21
 pydantic==1.10.2
     # via inflect
 pygerduty==0.38.3
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 pyjwt==2.6.0
     # via
     #   adal
@@ -286,16 +284,16 @@ pyjwt==2.6.0
     #   twilio
 pyopenssl==23.2.0
     # via
-    #   -r requirements/requirements.in
+    #   -r requirements.in
     #   twisted
 pyparsing==2.4.6
     # via
-    #   -r requirements/requirements.in
+    #   -r requirements.in
     #   packaging
 pyrsistent==0.19.2
     # via jsonschema
 python-daemon==3.0.1
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 python-dateutil==2.8.2
     # via
     #   adal
@@ -303,17 +301,17 @@ python-dateutil==2.8.2
     #   kubernetes
     #   receptorctl
 python-dsv-sdk==1.0.1
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 python-jose==3.3.0
     # via social-auth-core
 python-ldap==3.4.3
     # via
-    #   -r requirements/requirements.in
+    #   -r requirements.in
     #   django-auth-ldap
 python-string-utils==1.0.0
     # via openshift
 python-tss-sdk==1.2.1
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 python3-openid==3.2.0
     # via social-auth-core
 pytz==2022.6
@@ -324,17 +322,17 @@ pytz==2022.6
     #   twilio
 pyyaml==6.0.1
     # via
-    #   -r requirements/requirements.in
+    #   -r requirements.in
     #   djangorestframework-yaml
     #   kubernetes
     #   receptorctl
 receptorctl==1.3.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 redis==4.4.4
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 requests==2.31.0
     # via
-    #   -r requirements/requirements.in
+    #   -r requirements.in
     #   adal
     #   azure-core
     #   azure-keyvault
@@ -362,9 +360,9 @@ semantic-version==2.10.0
 service-identity==21.1.0
     # via twisted
 setuptools-rust==1.5.2
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 setuptools-scm[toml]==7.1.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 six==1.16.0
     # via
     #   automat
@@ -381,30 +379,30 @@ six==1.16.0
     #   service-identity
     #   tacacs-plus
 slack-sdk==3.19.4
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 smmap==5.0.0
     # via gitdb
 social-auth-app-django==5.0.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 social-auth-core[openidconnect]==4.3.0
     # via
-    #   -r requirements/requirements.in
+    #   -r requirements.in
     #   social-auth-app-django
 sqlparse==0.4.4
     # via
-    #   -r requirements/requirements.in
+    #   -r requirements.in
     #   django
 tacacs-plus==1.0
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 tempora==5.1.0
     # via
     #   irc
     #   jaraco-logging
 twilio==7.15.3
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 twisted[tls]==22.10.0
     # via
-    #   -r requirements/requirements.in
+    #   -r requirements.in
     #   daphne
 txaio==22.2.1
     # via autobahn
@@ -416,19 +414,19 @@ typing-extensions==4.4.0
     #   setuptools-rust
     #   setuptools-scm
     #   twisted
-urllib3==1.26.13
+urllib3==1.26.17
     # via
     #   botocore
     #   kubernetes
     #   requests
 uwsgi==2.0.21
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 uwsgitop==0.11
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 websocket-client==1.4.2
     # via kubernetes
 wheel==0.38.4
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 wrapt==1.15.0
     # via deprecated
 yarl==1.8.1
@@ -438,10 +436,10 @@ zope-interface==5.5.2
 
 # The following packages are considered to be unsafe in a requirements file:
 pip==21.2.4
-    # via -r requirements/requirements.in
+    # via -r requirements.in
 setuptools==65.6.3
     # via
-    #   -r requirements/requirements.in
+    #   -r requirements.in
     #   asciichartpy
     #   autobahn
     #   kubernetes
