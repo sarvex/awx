@@ -244,9 +244,7 @@ oauthlib==3.2.2
 openshift==0.13.1
     # via -r requirements/requirements.in
 packaging==21.3
-    # via
-    #   redis
-    #   setuptools-scm
+    # via setuptools-scm
 pbr==5.11.0
     # via -r requirements/requirements.in
 pexpect==4.8.0
@@ -390,6 +388,7 @@ social-auth-core[openidconnect]==4.3.0
     # via
     #   -r requirements/requirements.in
     #   social-auth-app-django
+    #   social-auth-core
 sqlparse==0.4.4
     # via
     #   -r requirements/requirements.in
@@ -402,10 +401,11 @@ tempora==5.1.0
     #   jaraco-logging
 twilio==7.15.3
     # via -r requirements/requirements.in
-twisted[tls]==22.10.0
+twisted[tls]==23.10.0
     # via
     #   -r requirements/requirements.in
     #   daphne
+    #   twisted
 txaio==22.2.1
     # via autobahn
 typing-extensions==4.4.0
