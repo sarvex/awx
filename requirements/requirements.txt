@@ -208,7 +208,7 @@ json-log-formatter==0.5.1
     # via -r requirements/requirements.in
 jsonschema==4.17.3
     # via -r requirements/requirements.in
-jwcrypto==1.4.2
+jwcrypto==1.5.6
     # via django-oauth-toolkit
 kubernetes==25.3.0
     # via openshift
