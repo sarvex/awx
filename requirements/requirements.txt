@@ -275,7 +275,7 @@ pyasn1-modules==0.2.8
     #   service-identity
 pycparser==2.21
     # via cffi
-pydantic==1.10.2
+pydantic==1.10.13
     # via inflect
 pygerduty==0.38.3
     # via -r requirements/requirements.in
